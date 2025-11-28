@@ -3,7 +3,7 @@ import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import xml.etree.ElementTree as ET
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, send_from_directory
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -38,7 +38,9 @@ SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
 for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
     os.makedirs(d, exist_ok=True)
 
-app = Flask(__name__)
+# UPDATE the Flask app definition to point to the static folder
+app = Flask(__name__, static_folder='static', static_url_path='/')
+
 # Robust CORS: Allow all origins to prevent network errors during development
 CORS(app, resources={r"/*": {"origins": "*"}}, allow_headers=["Content-Type", "Authorization"])
 
@@ -83,7 +85,7 @@ def detect_diagram_type(file_path):
 
 # --- ROUTES ---
 
-@app.route("/")
+@app.route("/api/status") # Renamed from / to avoid conflict with frontend serving
 def hello(): return "Backend server (Header Auth + Sandbox + Chatbot) is running!"
 
 @app.route('/auth/register', methods=['POST'])
@@ -498,6 +500,17 @@ def admin_delete_seminar(seminar_id):
         conn.commit(); return jsonify({"message": "Seminar deleted"})
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
     finally: cur.close(); conn.close()
+
+# --- FRONTEND SERVING ROUTE (NEW) ---
+# This handles the root URL "/" and any other URL not matched by API routes (like /dashboard, /login)
+# It ensures React router handles the navigation on the client side.
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    if path != "" and os.path.exists(app.static_folder + '/' + path):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
