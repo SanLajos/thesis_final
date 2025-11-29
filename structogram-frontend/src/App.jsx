@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Code, HelpCircle, LogOut } from 'lucide-react';
 import { api } from './services/ApiService';
+import { ToastProvider, useToast } from './context/ToastContext'; // Import Context
 
 // --- Import Components ---
 import ChatWidget from './components/ChatWidget';
@@ -12,13 +13,14 @@ import { AssignmentDashboard } from './pages/AssignmentDashboard';
 import { AssignmentCreate } from './pages/AssignmentCreate';
 import { SubmissionList } from './pages/SubmissionList';
 import { StudentSubmission } from './pages/StudentSubmission';
-import { GradingResult } from './pages/GradingResult'; // Imported from your new file
+import { GradingResult } from './pages/GradingResult';
 
-// --- ROOT APP ---
-export default function App() {
+// --- Main Application Logic ---
+function MainApp() {
   const [user, setUser] = useState(null); 
   const [view, setView] = useState('login'); 
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast(); // Now accessible here
   
   // App-Wide State
   const [activeSeminar, setActiveSeminar] = useState(null);
@@ -43,7 +45,6 @@ export default function App() {
     checkSession();
   }, []);
 
-  // Fetch assignments when entering dashboard
   useEffect(() => {
     if (view === 'dashboard' && activeSeminar) {
         refreshAssignments();
@@ -60,21 +61,31 @@ export default function App() {
     if(res.ok) {
         setSubmissionsList(res.data);
         setView('submissions');
+    } else {
+        addToast("Failed to fetch submissions", "error");
     }
   };
 
-  const handleLogin = (userObj) => { setUser(userObj); setView('seminars'); };
-  const handleLogout = () => { api.clearSession(); setUser(null); setView('login'); };
+  const handleLogin = (userObj) => { 
+      setUser(userObj); 
+      setView('seminars'); 
+      addToast(`Welcome back, ${userObj.username}!`, "success");
+  };
+  
+  const handleLogout = () => { 
+      api.clearSession(); 
+      setUser(null); 
+      setView('login'); 
+      addToast("Logged out successfully", "info");
+  };
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   
-  // Auth Views
   if (!user) {
     if (view === 'register') return <Register onLogin={handleLogin} onSwitch={() => setView('login')} />;
     return <Login onLogin={handleLogin} onSwitch={() => setView('register')} />;
   }
 
-  // Main App View
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <nav className="bg-slate-900 text-white p-4 shadow mb-6 flex justify-between">
@@ -89,7 +100,6 @@ export default function App() {
         </div>
       </nav>
       
-      {/* View Router */}
       {view === 'seminars' && (
         <SeminarList 
           setActiveSeminar={setActiveSeminar} 
@@ -145,4 +155,13 @@ export default function App() {
       <ChatWidget /> 
     </div>
   );
+}
+
+// --- ROOT WRAPPER ---
+export default function App() {
+    return (
+        <ToastProvider>
+            <MainApp />
+        </ToastProvider>
+    );
 }

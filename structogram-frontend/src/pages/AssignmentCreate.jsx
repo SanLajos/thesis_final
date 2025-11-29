@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { api } from '../services/ApiService';
+import { useToast } from '../context/ToastContext'; // Import Hook
 
 export const AssignmentCreate = ({ activeSeminar, setView, refreshAssignments }) => {
+  const { addToast } = useToast(); // Destructure
   const [formData, setFormData] = useState({
     title: '', description: '', grading_prompt: '', 
     language: 'python', grading_type: 'ai',
@@ -18,6 +20,11 @@ export const AssignmentCreate = ({ activeSeminar, setView, refreshAssignments })
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.title || !file) {
+        addToast("Please fill in title and upload a template file", "error");
+        return;
+    }
+
     const payload = new FormData();
     payload.append('seminar_id', activeSeminar.id);
     Object.keys(formData).forEach(key => payload.append(key, formData[key]));
@@ -26,17 +33,22 @@ export const AssignmentCreate = ({ activeSeminar, setView, refreshAssignments })
 
     const res = await api.request('/assignment', 'POST', payload, true);
     if (res.ok) { 
+      addToast("Assignment created successfully!", "success"); // Success Toast
       refreshAssignments(); 
       setView('dashboard'); 
-    } else alert("Failed: " + (res.data.error || "Unknown"));
+    } else {
+      addToast(res.data.error || "Failed to create assignment", "error"); // Error Toast
+    }
   };
 
   return (
     <div className="max-w-3xl mx-auto bg-white p-8 rounded shadow">
+      {/* ... (Existing JSX remains exactly the same, just the handleSubmit changed) ... */}
       <h2 className="text-2xl font-bold mb-4">New Assignment for {activeSeminar.title}</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
           <input placeholder="Title" className="w-full p-2 border rounded" onChange={e=>updateField('title', e.target.value)}/>
           <textarea placeholder="Description" className="w-full p-2 border rounded" onChange={e=>updateField('description', e.target.value)}/>
+          {/* ... rest of your form inputs ... */}
           <div className="flex gap-4">
             <select className="p-2 border rounded" onChange={e=>updateField('language', e.target.value)}>
               <option value="python">Python</option><option value="cpp">C++</option><option value="java">Java</option>

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { api } from '../services/ApiService';
 import { RefreshCw } from 'lucide-react';
+import { useToast } from '../context/ToastContext'; // Import
 
 export const StudentSubmission = ({ currentAssignment, setView, setGradingResult }) => {
+  const { addToast } = useToast();
   const [mode, setMode] = useState('xml');
   const [xmlType, setXmlType] = useState('flowchart');
   const [description, setDescription] = useState('');
@@ -10,7 +12,13 @@ export const StudentSubmission = ({ currentAssignment, setView, setGradingResult
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setLoading(true);
+    e.preventDefault(); 
+    if(!file) {
+        addToast("Please select a file.", "error");
+        return;
+    }
+    setLoading(true);
+    
     const formData = new FormData(); 
     formData.append('diagram_file', file); 
     formData.append('submission_mode', mode);
@@ -20,8 +28,9 @@ export const StudentSubmission = ({ currentAssignment, setView, setGradingResult
     try {
       const res = await api.request(`/submit/${currentAssignment.id}`, 'POST', formData, true);
       if (!res.ok) { 
-        alert("Failed:\n" + (res.data.error || "Unknown")); 
+        addToast("Submission Failed: " + (res.data.error || "Unknown"), "error");
       } else { 
+        addToast("Grading complete!", "success");
         const data = res.data;
         setGradingResult({
             ...data,
@@ -31,12 +40,16 @@ export const StudentSubmission = ({ currentAssignment, setView, setGradingResult
         });
         setView('grading'); 
       }
-    } catch (err) { alert("Failed."); } 
-    finally { setLoading(false); }
+    } catch (err) { 
+        addToast("Network Error: Could not submit.", "error"); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
   return (
     <div className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-lg border border-slate-200 mt-10">
+        {/* ... (Existing JSX remains exactly the same) ... */}
         <button onClick={() => setView('dashboard')} className="text-slate-500 mb-4">&larr; Back</button>
         <h2 className="text-2xl font-bold mb-2">Submit: {currentAssignment.title}</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
