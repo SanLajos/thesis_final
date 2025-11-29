@@ -63,24 +63,45 @@ def _is_fuzzy_inside(inner, outer):
 def _generate_node_code(node, gen, indent=1):
     lines = []; prefix = "    " * indent
     val = node['value'].lower(); raw_val = node['value']
+    
+    # 1. Handle Loops
     if val.startswith('while ') or val.startswith('for '):
         lines.append(prefix + gen.while_start(raw_val.replace('while ', '').replace('for ', '')))
         node['children'].sort(key=lambda c: c['y'])
         for child in node['children']: lines.extend(_generate_node_code(child, gen, indent + 1))
         if gen.block_end(): lines.append(prefix + gen.block_end())
-    elif val.startswith('if '):
-        lines.append(prefix + gen.if_start(raw_val.replace('if ', '')))
+    
+    # 2. Handle Decisions (Expanded Logic)
+    # Checks for 'if', '?', '<', '>' but ensures it's not a print statement
+    elif (val.startswith('if ') or '?' in val or '<' in val or '>' in val) and not (val.startswith('print ') or val.startswith('output ')):
+        
+        # Clean condition string
+        condition = raw_val
+        if val.startswith('if '):
+            condition = raw_val[3:] # Remove 'if ' prefix
+        
+        # Remove question marks as they are visual cues, not syntax
+        condition = condition.replace('?', '').strip()
+
+        lines.append(prefix + gen.if_start(condition))
+        
+        # Geometric Logic for True/False branches (Left=True, Right=False convention)
         mid_x = node['x'] + (node['w'] / 2)
         true_children = [c for c in node['children'] if (c['x'] + c['w']/2) < mid_x]
         false_children = [c for c in node['children'] if (c['x'] + c['w']/2) >= mid_x]
+        
         true_children.sort(key=lambda c: c['y'])
         false_children.sort(key=lambda c: c['y'])
+        
         for child in true_children: lines.extend(_generate_node_code(child, gen, indent + 1))
         if gen.block_end(): lines.append(prefix + gen.block_end())
+        
         if false_children:
             lines.append(prefix + gen.else_start())
             for child in false_children: lines.extend(_generate_node_code(child, gen, indent + 1))
             if gen.block_end(): lines.append(prefix + gen.block_end())
+            
+    # 3. Handle Statements
     else:
         if val.startswith("print ") or val.startswith("output "):
             content = raw_val.split(" ", 1)[1]

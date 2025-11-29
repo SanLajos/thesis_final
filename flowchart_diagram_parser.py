@@ -71,6 +71,8 @@ def _parse_block(current_id, stop_id, nodes, edges, gen, indentation=0):
         if not node: break
         value = node['value']
         style = node['style']
+        
+        # --- Handle Node Types ---
         if value.lower() == 'start': pass
         elif value.lower() == 'end': return code_lines
         elif 'rhombus' in style:
@@ -87,7 +89,15 @@ def _parse_block(current_id, stop_id, nodes, edges, gen, indentation=0):
                 code_lines.append(indent_str + gen.statement(value))
         else:
             if value: code_lines.append(indent_str + gen.comment(f"IO/Other: {value}"))
+        
+        # --- Handle Transitions & Errors ---
         outgoing_edges = edges.get(current_node_id, [])
+        
+        if len(outgoing_edges) == 0:
+            # Only 'End' nodes are allowed to have no outgoing edges.
+            # Since 'End' is handled above, getting here means a dead end.
+            raise Exception(f"Node '{value}' has no outgoing connections. Please connect it to another block or 'End'.")
+
         if len(outgoing_edges) == 1: current_node_id = outgoing_edges[0]['target']
         elif len(outgoing_edges) > 1:
             code_lines.append(indent_str + gen.comment("WARNING: Fork detected. Following first path."))
@@ -99,7 +109,11 @@ def _handle_decision(decision_id, stop_id, nodes, edges, gen, indentation):
     indent_str = "    " * indentation
     condition = nodes[decision_id]['value']
     branches = edges.get(decision_id, [])
-    if len(branches) < 2: return [indent_str + gen.comment(f"Malformed decision: {condition}")], None
+    
+    # --- New Strict Validation ---
+    if not branches or len(branches) < 2: 
+        raise Exception(f"Decision node '{condition}' is malformed. It must have at least 2 outgoing connections (e.g., Yes and No).")
+
     body_branch = None
     exit_branch = None
     for branch in branches:

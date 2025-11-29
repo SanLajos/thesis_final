@@ -28,7 +28,7 @@ from db_utils import get_db_connection
 from static_analysis_grader import analyze_code_style
 from keyword_grader import grade_with_keywords
 from execution_engine import run_test_cases
-from chatbot_engine import chat_with_tutor # <--- NEW IMPORT: Chatbot Engine
+from chatbot_engine import chat_with_tutor 
 
 # --- CONFIGURATION ---
 UPLOAD_FOLDER = 'uploads'
@@ -38,10 +38,9 @@ SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
 for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
     os.makedirs(d, exist_ok=True)
 
-# UPDATE the Flask app definition to point to the static folder
 app = Flask(__name__, static_folder='static', static_url_path='/')
 
-# Robust CORS: Allow all origins to prevent network errors during development
+# Robust CORS
 CORS(app, resources={r"/*": {"origins": "*"}}, allow_headers=["Content-Type", "Authorization"])
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -52,27 +51,21 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 # --- HELPERS ---
 
 def get_current_user():
-    # Logic: Read ONLY from Authorization header (Bearer Token)
     auth_header = request.headers.get('Authorization')
     if not auth_header: return None
-    
     try:
-        # Header format: "Bearer <token>"
         token = auth_header.split(" ")[1]
     except IndexError:
         return None
-        
     return decode_token(token, verify_type='access')
 
 def validate_file_content(file_stream, expected_type):
-    # Validates file content using magic bytes
     header = file_stream.read(2048)
     file_stream.seek(0) 
     mime = magic.from_buffer(header, mime=True)
     if expected_type == 'image':
         if not mime.startswith('image/'): return False, f"Invalid file content. Expected image, got {mime}"
     elif expected_type == 'xml':
-        # XML mimes can vary
         valid_xml_mimes = ['text/xml', 'application/xml', 'text/plain'] 
         if mime not in valid_xml_mimes: return False, f"Invalid file content. Expected XML, got {mime}"
     return True, mime
@@ -83,9 +76,26 @@ def detect_diagram_type(file_path):
         return 'flowchart' if len(root.findall(".//mxCell[@edge='1']")) > 0 else 'nassi_shneiderman'
     except: return 'flowchart'
 
+def validate_code_safety(code, language):
+    """
+    Basic security filter to prevent execution of dangerous commands.
+    This prevents students from submitting diagrams that generate malicious code.
+    """
+    forbidden_patterns = {
+        'python': ['import os', 'import sys', 'import subprocess', 'from os', 'from sys', 'exec(', 'eval(', 'open(', '__import__', 'os.system'],
+        'cpp': ['system(', 'popen(', 'fork(', 'execv', 'execl', '<cstdlib>'],
+        'java': ['Runtime.getRuntime', 'ProcessBuilder', 'System.exit']
+    }
+    
+    patterns = forbidden_patterns.get(language, [])
+    for pattern in patterns:
+        if pattern in code:
+            return False, pattern
+    return True, None
+
 # --- ROUTES ---
 
-@app.route("/api/status") # Renamed from / to avoid conflict with frontend serving
+@app.route("/api/status") 
 def hello(): return "Backend server (Header Auth + Sandbox + Chatbot) is running!"
 
 @app.route('/auth/register', methods=['POST'])
@@ -168,7 +178,6 @@ def get_me():
     if not u: return jsonify({"error": "Unauthorized"}), 401
     return jsonify({"user": {"id": u['user_id'], "role": u['role'], "username": u['username']}})
 
-# --- CHATBOT ROUTE (NEW) ---
 @app.route('/chat', methods=['POST'])
 @limiter.limit("10 per minute")
 def chat():
@@ -187,7 +196,6 @@ def chat():
     if 'error' in response: return jsonify(response), 500
     return jsonify(response), 200
 
-# --- SEMINAR ROUTES ---
 @app.route('/seminars', methods=['GET'])
 def list_seminars():
     u = get_current_user(); 
@@ -238,7 +246,6 @@ def leave_seminar(seminar_id):
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
     finally: cur.close(); conn.close()
 
-# --- ASSIGNMENT ROUTES ---
 @app.route('/assignments', methods=['GET'])
 def list_assignments():
     u = get_current_user(); sid = request.args.get('seminar_id')
@@ -373,6 +380,13 @@ def submit_for_grading(assignment_id):
                 generated_code = parse_ns(submission_path, language=target_language)
                 complexity_score = calculate_cyclomatic_complexity(generated_code, language=target_language)
 
+        # --- SECURITY CHECK ---
+        is_safe, unsafe_keyword = validate_code_safety(generated_code, target_language)
+        if not is_safe:
+            # We explicitly reject the submission and do not run it.
+            conn.rollback() # Or we could commit the record but mark it as failed. Here we choose to fail the request.
+            return jsonify({"error": f"Security Violation: Your diagram produces code with forbidden keyword '{unsafe_keyword}'."}), 400
+
         static_report = None
         if assignment.get('static_analysis_enabled'): static_report = analyze_code_style(generated_code, language=target_language)
         
@@ -501,9 +515,6 @@ def admin_delete_seminar(seminar_id):
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
     finally: cur.close(); conn.close()
 
-# --- FRONTEND SERVING ROUTE (NEW) ---
-# This handles the root URL "/" and any other URL not matched by API routes (like /dashboard, /login)
-# It ensures React router handles the navigation on the client side.
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
