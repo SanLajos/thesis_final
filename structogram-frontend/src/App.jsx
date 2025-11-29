@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Code, HelpCircle, LogOut } from 'lucide-react';
+import { Code, HelpCircle, LogOut, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
 import { api } from './services/ApiService';
-import { ToastProvider, useToast } from './context/ToastContext'; // Import Context
 
 // --- Import Components ---
 import ChatWidget from './components/ChatWidget';
@@ -15,12 +14,10 @@ import { SubmissionList } from './pages/SubmissionList';
 import { StudentSubmission } from './pages/StudentSubmission';
 import { GradingResult } from './pages/GradingResult';
 
-// --- Main Application Logic ---
-function MainApp() {
+export default function App() {
   const [user, setUser] = useState(null); 
   const [view, setView] = useState('login'); 
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast(); // Now accessible here
   
   // App-Wide State
   const [activeSeminar, setActiveSeminar] = useState(null);
@@ -29,29 +26,67 @@ function MainApp() {
   const [submissionsList, setSubmissionsList] = useState([]);
   const [gradingResult, setGradingResult] = useState(null);
 
+  // --- ROUTING LOGIC (Hash Based) ---
+  
+  // 1. Listen for URL hash changes (Browser Back Button support)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash) setView(hash);
+    };
+
+    // Initialize on load
+    handleHashChange();
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // 2. Custom Navigation Function (Replaces setView)
+  const navigate = (newView) => {
+    window.location.hash = newView;
+    setView(newView); // Immediate update for responsiveness
+  };
+
+  // 3. Back Button Action
+  const goBack = () => {
+    window.history.back();
+  };
+
+  // --- INITIALIZATION ---
+
   useEffect(() => {
     const checkSession = async () => {
         if (api.token) {
             const res = await api.getMe();
             if (res.ok) { 
                 setUser(res.data.user); 
-                setView('seminars'); 
+                // Redirect to seminars if on login page or root
+                if (view === 'login' || view === '') navigate('seminars');
             } else { 
                 api.clearSession(); 
+                navigate('login');
             }
+        } else {
+            navigate('login');
         }
         setLoading(false);
     };
     checkSession();
   }, []);
 
+  // Fetch assignments when entering dashboard
   useEffect(() => {
     if (view === 'dashboard' && activeSeminar) {
         refreshAssignments();
+    } else if (view === 'dashboard' && !activeSeminar) {
+        // Safety: If user refreshes on #dashboard, activeSeminar is lost. Redirect back.
+        navigate('seminars');
     }
   }, [view, activeSeminar]);
 
   const refreshAssignments = () => {
+    if (!activeSeminar) return;
     api.request(`/assignments?seminar_id=${activeSeminar.id}`)
        .then(r => r.ok ? setAssignments(r.data) : setAssignments([]));
   }
@@ -60,50 +95,63 @@ function MainApp() {
     const res = await api.request(`/assignment/${aid}/submissions`);
     if(res.ok) {
         setSubmissionsList(res.data);
-        setView('submissions');
-    } else {
-        addToast("Failed to fetch submissions", "error");
+        navigate('submissions');
     }
   };
 
   const handleLogin = (userObj) => { 
       setUser(userObj); 
-      setView('seminars'); 
-      addToast(`Welcome back, ${userObj.username}!`, "success");
+      navigate('seminars'); 
   };
   
   const handleLogout = () => { 
       api.clearSession(); 
       setUser(null); 
-      setView('login'); 
-      addToast("Logged out successfully", "info");
+      navigate('login'); 
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   
+  // Auth Views
   if (!user) {
-    if (view === 'register') return <Register onLogin={handleLogin} onSwitch={() => setView('login')} />;
-    return <Login onLogin={handleLogin} onSwitch={() => setView('register')} />;
+    if (view === 'register') return <Register onLogin={handleLogin} onSwitch={() => navigate('login')} />;
+    return <Login onLogin={handleLogin} onSwitch={() => navigate('register')} />;
   }
 
+  // Main App View
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <nav className="bg-slate-900 text-white p-4 shadow mb-6 flex justify-between">
-        <div className="font-bold text-xl flex gap-2 items-center cursor-pointer" onClick={()=>setView('seminars')}>
-          <Code/> StructogramAI
+        <div className="flex items-center gap-4">
+            {/* Global Back Button - Shows unless on the main list */}
+            {view !== 'seminars' && (
+                <button 
+                    onClick={goBack} 
+                    className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors"
+                    title="Go Back"
+                >
+                    <ArrowLeft size={20} />
+                </button>
+            )}
+            
+            <div className="font-bold text-xl flex gap-2 items-center cursor-pointer" onClick={()=>navigate('seminars')}>
+            <Code/> StructogramAI
+            </div>
         </div>
+
         <div className="flex gap-4 items-center">
-            {user.role === 'admin' && <button onClick={() => setView('admin')}>Admin</button>}
-            <button onClick={() => setView('help')}><HelpCircle size={20}/></button>
+            {user.role === 'admin' && <button onClick={() => navigate('admin')}>Admin</button>}
+            <button onClick={() => navigate('help')}><HelpCircle size={20}/></button>
             <span>{user.username} ({user.role})</span>
             <button onClick={handleLogout}><LogOut size={18}/></button>
         </div>
       </nav>
       
+      {/* View Router - Passing 'navigate' as 'setView' for compatibility */}
       {view === 'seminars' && (
         <SeminarList 
           setActiveSeminar={setActiveSeminar} 
-          setView={setView} 
+          setView={navigate} 
           user={user} 
         />
       )}
@@ -111,7 +159,7 @@ function MainApp() {
       {view === 'dashboard' && activeSeminar && (
         <AssignmentDashboard 
           activeSeminar={activeSeminar} 
-          setView={setView} 
+          setView={navigate} 
           user={user} 
           assignments={assignments} 
           setAssignments={setAssignments}
@@ -123,7 +171,7 @@ function MainApp() {
       {view === 'create' && (
         <AssignmentCreate 
           activeSeminar={activeSeminar} 
-          setView={setView} 
+          setView={navigate} 
           refreshAssignments={refreshAssignments} 
         />
       )}
@@ -131,7 +179,7 @@ function MainApp() {
       {view === 'submissions' && (
         <SubmissionList 
           submissionsList={submissionsList} 
-          setView={setView} 
+          setView={navigate} 
           setGradingResult={setGradingResult}
           currentAssignment={currentAssignment}
         />
@@ -140,7 +188,7 @@ function MainApp() {
       {view === 'submit' && (
         <StudentSubmission 
           currentAssignment={currentAssignment} 
-          setView={setView} 
+          setView={navigate} 
           setGradingResult={setGradingResult}
         />
       )}
@@ -148,20 +196,11 @@ function MainApp() {
       {view === 'grading' && (
         <GradingResult 
           gradingResult={gradingResult} 
-          setView={setView} 
+          setView={navigate} 
         />
       )}
 
       <ChatWidget /> 
     </div>
   );
-}
-
-// --- ROOT WRAPPER ---
-export default function App() {
-    return (
-        <ToastProvider>
-            <MainApp />
-        </ToastProvider>
-    );
 }
