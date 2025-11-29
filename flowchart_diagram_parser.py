@@ -2,8 +2,11 @@ import xml.etree.ElementTree as ET
 import re
 from code_generators import get_generator
 
-YES_LABELS = ['yes', 'true', '1', 'y']
-NO_LABELS = ['no', 'false', '0', 'n']
+# --- IMPROVED LABEL MATCHING (REGEX) ---
+# Matches: yes, y, yep, yeah, true, t, 1, ok
+YES_PATTERN = re.compile(r"^\s*(y(es|ep|eah|up)?|t(rue)?|1|ok)\s*$", re.IGNORECASE)
+# Matches: no, n, nope, nah, false, f, 0
+NO_PATTERN = re.compile(r"^\s*(n(o|ope|ah)?|f(alse)?|0)\s*$", re.IGNORECASE)
 
 def parse_drawio_xml(file_path, language='python', return_graph=False):
     try:
@@ -56,8 +59,15 @@ def _build_graph(file_path):
             target_id = cell.get('target')
             if source_id and target_id:
                 if source_id not in edges: edges[source_id] = []
-                edges[source_id].append({'target': target_id, 'value': value.lower()})
+                # Store the value for later regex checking
+                edges[source_id].append({'target': target_id, 'value': value})
     return nodes, edges
+
+def _is_yes_label(text):
+    return bool(YES_PATTERN.match(text))
+
+def _is_no_label(text):
+    return bool(NO_PATTERN.match(text))
 
 def _parse_block(current_id, stop_id, nodes, edges, gen, indentation=0):
     code_lines = []
@@ -72,7 +82,6 @@ def _parse_block(current_id, stop_id, nodes, edges, gen, indentation=0):
         value = node['value']
         style = node['style']
         
-        # --- Handle Node Types ---
         if value.lower() == 'start': pass
         elif value.lower() == 'end': return code_lines
         elif 'rhombus' in style:
@@ -90,12 +99,9 @@ def _parse_block(current_id, stop_id, nodes, edges, gen, indentation=0):
         else:
             if value: code_lines.append(indent_str + gen.comment(f"IO/Other: {value}"))
         
-        # --- Handle Transitions & Errors ---
         outgoing_edges = edges.get(current_node_id, [])
         
         if len(outgoing_edges) == 0:
-            # Only 'End' nodes are allowed to have no outgoing edges.
-            # Since 'End' is handled above, getting here means a dead end.
             raise Exception(f"Node '{value}' has no outgoing connections. Please connect it to another block or 'End'.")
 
         if len(outgoing_edges) == 1: current_node_id = outgoing_edges[0]['target']
@@ -110,7 +116,6 @@ def _handle_decision(decision_id, stop_id, nodes, edges, gen, indentation):
     condition = nodes[decision_id]['value']
     branches = edges.get(decision_id, [])
     
-    # --- New Strict Validation ---
     if not branches or len(branches) < 2: 
         raise Exception(f"Decision node '{condition}' is malformed. It must have at least 2 outgoing connections (e.g., Yes and No).")
 
@@ -126,19 +131,42 @@ def _handle_decision(decision_id, stop_id, nodes, edges, gen, indentation):
         code_lines.extend(body_code)
         if gen.block_end(): code_lines.append(indent_str + gen.block_end())
         return code_lines, exit_branch['target']
+    
     code_lines = []
-    yes_branch = next((b for b in branches if b['value'].lower() in YES_LABELS), branches[0])
-    no_branch = next((b for b in branches if b['value'].lower() in NO_LABELS), branches[1] if len(branches)>1 else None)
+    
+    # --- Updated Regex Logic ---
+    # Find Explicit "Yes" Branch
+    yes_branch = next((b for b in branches if _is_yes_label(b['value'])), None)
+    
+    # Find Explicit "No" Branch
+    no_branch = next((b for b in branches if _is_no_label(b['value'])), None)
+    
+    # Smart Fallback Logic
+    if not yes_branch:
+        # If we found No, use the other as Yes. If neither found, default to index 0.
+        if no_branch:
+            yes_branch = next((b for b in branches if b != no_branch), None)
+        else:
+            yes_branch = branches[0]
+            
+    if not no_branch:
+        # If we found Yes, use the other as No. If neither found, default to index 1.
+        remaining = [b for b in branches if b != yes_branch]
+        no_branch = remaining[0] if remaining else None
+
     join_node_id = _find_join_node(yes_branch['target'], no_branch['target'] if no_branch else None, nodes, edges)
+    
     code_lines.append(indent_str + gen.if_start(condition))
     if_body = _parse_block(yes_branch['target'], join_node_id, nodes, edges, gen, indentation + 1)
     code_lines.extend(if_body)
     if gen.block_end(): code_lines.append(indent_str + gen.block_end())
+    
     if no_branch:
         code_lines.append(indent_str + gen.else_start())
         else_body = _parse_block(no_branch['target'], join_node_id, nodes, edges, gen, indentation + 1)
         code_lines.extend(else_body)
         if gen.block_end(): code_lines.append(indent_str + gen.block_end())
+        
     return code_lines, join_node_id
 
 def _find_path(start_id, target_id, nodes, edges, visited=None):
