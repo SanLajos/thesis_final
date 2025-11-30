@@ -1,119 +1,120 @@
 #!/bin/bash
 
+# ==========================================
 # StructogramAI - Fool-Proof Ubuntu Installer
-# Usage: sudo ./install.sh
+# ==========================================
 
-set -e
+set -e # Exit immediately if a command exits with a non-zero status
 
 # --- Configuration ---
-APP_DIR="/opt/structogram_ai"
-USER_GROUP="structogram_user"
+APP_DIR=$(pwd)
 DB_NAME="thesis_project"
-DB_PASS="password"
+DB_USER="postgres"
+DB_PASS="password" # Matches your backend/core/init_db.py config
 PYTHON_ENV="$APP_DIR/venv"
 
-log() { echo -e "\033[1;32m[StructogramAI] $1\033[0m"; }
-error() { echo -e "\033[1;31m[ERROR] $1\033[0m"; exit 1; }
+# Colors for pretty output
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+log() { echo -e "${GREEN}[StructogramAI]${NC} $1"; }
+info() { echo -e "${CYAN}[INFO]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # 1. Root Check
-if [ "$EUID" -ne 0 ]; then error "Run as root: sudo ./install.sh"; fi
+if [ "$EUID" -ne 0 ]; then 
+    error "Please run this installer as root: sudo ./install.sh"
+fi
 
-# 2. Dependencies
-log "Installing System Dependencies..."
+log "Starting Installation in $APP_DIR..."
+
+# 2. Install System Dependencies
+info "Updating system packages..."
 apt-get update -qq
-apt-get install -y curl git build-essential libmagic1 postgresql postgresql-contrib python3 python3-venv python3-dev nodejs npm default-jdk g++
+info "Installing Python, Node, Postgres, and build tools..."
+apt-get install -y curl git build-essential libmagic1 postgresql postgresql-contrib python3 python3-venv python3-dev python3-pip g++
 
-# Node.js Upgrade (ensure 18+)
-if [ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 18 ]; then
+# 3. Ensure Node.js 18+ (Required for Vite)
+NODE_VER=$(node -v 2>/dev/null | cut -d. -f1 | tr -d 'v')
+if [ -z "$NODE_VER" ] || [ "$NODE_VER" -lt 18 ]; then
+    info "Node.js is old or missing. Installing Node 18..."
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
     apt-get install -y nodejs
 fi
 
-# 3. Setup Directory & User
-log "Setting up Application Directory..."
-if ! id "$USER_GROUP" &>/dev/null; then useradd -r -s /bin/bash "$USER_GROUP"; fi
-
-# Wipe old install to be safe
-rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR"
-cp -r . "$APP_DIR/"
-
-# 4. AUTO-CORRECT FRONTEND FOLDER
-cd "$APP_DIR"
-if [ -d "structogram-frontend" ]; then
-    log "Renaming 'structogram-frontend' to 'frontend'..."
-    mv structogram-frontend frontend
-elif [ -d "frontend_temp" ]; then
-    mv frontend_temp frontend
+# 4. API Key Setup (One-Time Prompt)
+if [ ! -f "$APP_DIR/.env" ]; then
+    echo ""
+    echo "--------------------------------------------------------"
+    echo " An API Key from Google Gemini is required for AI grading."
+    echo "--------------------------------------------------------"
+    read -p "Enter your GEMINI_API_KEY: " INPUT_KEY
+    echo "GEMINI_API_KEY=$INPUT_KEY" > "$APP_DIR/.env"
+    log "API Key saved to .env"
+else
+    info "Existing .env file found. Skipping API key prompt."
 fi
 
-if [ ! -f "frontend/package.json" ]; then
-    error "Could not find frontend/package.json. Please check your upload."
+# 5. Frontend Setup
+log "Building Frontend..."
+
+# Handle folder naming inconsistency (structogram-frontend vs frontend)
+if [ -d "$APP_DIR/structogram-frontend" ] && [ ! -d "$APP_DIR/frontend" ]; then
+    mv "$APP_DIR/structogram-frontend" "$APP_DIR/frontend"
+    info "Renamed 'structogram-frontend' to 'frontend' folder."
 fi
 
-chown -R "$USER_GROUP:$USER_GROUP" "$APP_DIR"
+if [ ! -d "$APP_DIR/frontend" ]; then
+    error "Frontend folder not found! Please ensure 'frontend' or 'structogram-frontend' exists."
+fi
 
-# 5. Build Frontend
-log "Building Frontend (this takes a minute)..."
-sudo -u "$USER_GROUP" bash <<EOF
-    cd "$APP_DIR/frontend"
-    npm install --silent
-    npm run build
-EOF
+# Build React App
+cd "$APP_DIR/frontend"
+# Fix permissions so root can build, but revert later
+rm -rf node_modules package-lock.json
+npm install
+npm run build
 
-# Move artifacts to Backend
-log "Deploying Frontend..."
+# Deploy artifacts to Backend Static folder
+log "Deploying Frontend artifacts to Backend..."
 mkdir -p "$APP_DIR/backend/static"
-# Copy from dist or build, whichever exists
-if [ -d "$APP_DIR/frontend/dist" ]; then
-    cp -r "$APP_DIR/frontend/dist/"* "$APP_DIR/backend/static/"
-elif [ -d "$APP_DIR/frontend/build" ]; then
-    cp -r "$APP_DIR/frontend/build/"* "$APP_DIR/backend/static/"
-fi
+rm -rf "$APP_DIR/backend/static/*"
+cp -r dist/* "$APP_DIR/backend/static/"
 
 # 6. Backend Setup
-log "Setting up Python Environment..."
-sudo -u "$USER_GROUP" python3 -m venv "$PYTHON_ENV"
-sudo -u "$USER_GROUP" "$PYTHON_ENV/bin/pip" install --upgrade pip
-sudo -u "$USER_GROUP" "$PYTHON_ENV/bin/pip" install -r "$APP_DIR/requirements.txt"
+cd "$APP_DIR"
+log "Setting up Python Virtual Environment..."
+if [ -d "$PYTHON_ENV" ]; then rm -rf "$PYTHON_ENV"; fi
+python3 -m venv "$PYTHON_ENV"
+"$PYTHON_ENV/bin/pip" install --upgrade pip
+"$PYTHON_ENV/bin/pip" install -r requirements.txt
 
-# 7. Database
-log "Initializing Database..."
+# 7. Database Setup
+log "Configuring PostgreSQL..."
 service postgresql start
-sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DB_PASS';"
+
+# Set postgres user password (matches your DB_CONFIG)
+sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DB_PASS';" 2>/dev/null || true
+
+# Create Database if not exists
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || sudo -u postgres createdb "$DB_NAME"
 
-# Init Schema (Run as module to fix imports)
+# Run Init Script
+info "Initializing Database Schema..."
 export DB_PASSWORD="$DB_PASS"
-cd "$APP_DIR"
-sudo -u "$USER_GROUP" DB_PASSWORD="$DB_PASS" PYTHONPATH="$APP_DIR" "$PYTHON_ENV/bin/python3" -m backend.core.init_db
+export PYTHONPATH="$APP_DIR"
+"$PYTHON_ENV/bin/python3" -m backend.core.init_db
 
-# 8. Service
-log "Registering System Service..."
-cat > /etc/systemd/system/structogram.service <<EOF
-[Unit]
-Description=StructogramAI
-After=network.target postgresql.service
+# 8. Final Permissions
+log "Fixing ownership for user: $SUDO_USER"
+chown -R "$SUDO_USER:$SUDO_USER" "$APP_DIR"
 
-[Service]
-User=$USER_GROUP
-Group=$USER_GROUP
-WorkingDirectory=$APP_DIR
-Environment="PATH=$PYTHON_ENV/bin:/usr/bin"
-Environment="DB_PASSWORD=$DB_PASS"
-Environment="PYTHONPATH=$APP_DIR"
-# Environment="GEMINI_API_KEY=..." # Uncomment and add key for auto-start
-ExecStart=$PYTHON_ENV/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 backend.main:app
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable structogram
-
-# Final Permission Fix
-chown -R "$USER_GROUP:$USER_GROUP" "$APP_DIR"
-
-log "✅ Installation Complete! Run './run.sh' to start."
+echo ""
+echo "=========================================="
+echo "✅ INSTALLATION COMPLETE!"
+echo "=========================================="
+echo "To start the app, run:"
+echo "   ./run.sh"
+echo ""
