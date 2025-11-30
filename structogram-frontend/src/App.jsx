@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Code, HelpCircle, LogOut, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { Code, HelpCircle, LogOut, ArrowLeft } from 'lucide-react';
 import { api } from './services/ApiService';
 
 // --- Import Components ---
@@ -27,41 +27,32 @@ export default function App() {
   const [gradingResult, setGradingResult] = useState(null);
 
   // --- ROUTING LOGIC (Hash Based) ---
-  
-  // 1. Listen for URL hash changes (Browser Back Button support)
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
       if (hash) setView(hash);
     };
-
-    // Initialize on load
     handleHashChange();
-
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // 2. Custom Navigation Function (Replaces setView)
   const navigate = (newView) => {
     window.location.hash = newView;
-    setView(newView); // Immediate update for responsiveness
+    setView(newView); 
   };
 
-  // 3. Back Button Action
   const goBack = () => {
     window.history.back();
   };
 
   // --- INITIALIZATION ---
-
   useEffect(() => {
     const checkSession = async () => {
         if (api.token) {
             const res = await api.getMe();
             if (res.ok) { 
                 setUser(res.data.user); 
-                // Redirect to seminars if on login page or root
                 if (view === 'login' || view === '') navigate('seminars');
             } else { 
                 api.clearSession(); 
@@ -75,12 +66,11 @@ export default function App() {
     checkSession();
   }, []);
 
-  // Fetch assignments when entering dashboard
+  // Fetch assignments logic
   useEffect(() => {
     if (view === 'dashboard' && activeSeminar) {
         refreshAssignments();
     } else if (view === 'dashboard' && !activeSeminar) {
-        // Safety: If user refreshes on #dashboard, activeSeminar is lost. Redirect back.
         navigate('seminars');
     }
   }, [view, activeSeminar]);
@@ -99,18 +89,10 @@ export default function App() {
     }
   };
 
-  const handleLogin = (userObj) => { 
-      setUser(userObj); 
-      navigate('seminars'); 
-  };
-  
-  const handleLogout = () => { 
-      api.clearSession(); 
-      setUser(null); 
-      navigate('login'); 
-  };
+  const handleLogin = (userObj) => { setUser(userObj); navigate('seminars'); };
+  const handleLogout = () => { api.clearSession(); setUser(null); navigate('login'); };
 
-  if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center text-[#1B3147]">Loading...</div>;
   
   // Auth Views
   if (!user) {
@@ -118,87 +100,52 @@ export default function App() {
     return <Login onLogin={handleLogin} onSwitch={() => navigate('register')} />;
   }
 
-  // Main App View
+  // --- MAIN APP VIEW ---
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      <nav className="bg-slate-900 text-white p-4 shadow mb-6 flex justify-between">
+    // Global Background: Eye-Friendly Off-White
+    <div className="min-h-screen bg-[#F5F7FA] pb-20">
+      
+      {/* Navbar: Biscay Background */}
+      <nav className="bg-[#1B3147] text-white p-4 shadow-md mb-6 flex justify-between transition-colors">
         <div className="flex items-center gap-4">
-            {/* Global Back Button - Shows unless on the main list */}
             {view !== 'seminars' && (
                 <button 
                     onClick={goBack} 
-                    className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors"
+                    // Back Button: Slightly Lighter Biscay for contrast
+                    className="p-2 bg-[#243b55] hover:bg-[#2c4a6b] rounded-full transition-colors"
                     title="Go Back"
                 >
                     <ArrowLeft size={20} />
                 </button>
             )}
             
+            {/* Logo: StructogrAIm with Turquoise Icon */}
             <div className="font-bold text-xl flex gap-2 items-center cursor-pointer" onClick={()=>navigate('seminars')}>
-            <Code/> StructogramAI
+                <Code className="text-[#40E0D0]" /> <span>StructogrAIm</span>
             </div>
         </div>
 
         <div className="flex gap-4 items-center">
-            {user.role === 'admin' && <button onClick={() => navigate('admin')}>Admin</button>}
-            <button onClick={() => navigate('help')}><HelpCircle size={20}/></button>
-            <span>{user.username} ({user.role})</span>
-            <button onClick={handleLogout}><LogOut size={18}/></button>
+            {user.role === 'admin' && <button className="hover:text-[#40E0D0]" onClick={() => navigate('admin')}>Admin</button>}
+            <button className="hover:text-[#40E0D0]" onClick={() => navigate('help')}><HelpCircle size={20}/></button>
+            <span className="opacity-90">{user.username} ({user.role})</span>
+            <button className="hover:text-[#40E0D0]" onClick={handleLogout}><LogOut size={18}/></button>
         </div>
       </nav>
       
-      {/* View Router - Passing 'navigate' as 'setView' for compatibility */}
-      {view === 'seminars' && (
-        <SeminarList 
-          setActiveSeminar={setActiveSeminar} 
-          setView={navigate} 
-          user={user} 
-        />
-      )}
-      
+      {/* View Router */}
+      {view === 'seminars' && <SeminarList setActiveSeminar={setActiveSeminar} setView={navigate} user={user} />}
       {view === 'dashboard' && activeSeminar && (
         <AssignmentDashboard 
-          activeSeminar={activeSeminar} 
-          setView={navigate} 
-          user={user} 
-          assignments={assignments} 
-          setAssignments={setAssignments}
-          setCurrentAssignment={setCurrentAssignment}
-          fetchSubmissions={fetchSubmissions}
+          activeSeminar={activeSeminar} setView={navigate} user={user} 
+          assignments={assignments} setAssignments={setAssignments}
+          setCurrentAssignment={setCurrentAssignment} fetchSubmissions={fetchSubmissions}
         />
       )}
-
-      {view === 'create' && (
-        <AssignmentCreate 
-          activeSeminar={activeSeminar} 
-          setView={navigate} 
-          refreshAssignments={refreshAssignments} 
-        />
-      )}
-
-      {view === 'submissions' && (
-        <SubmissionList 
-          submissionsList={submissionsList} 
-          setView={navigate} 
-          setGradingResult={setGradingResult}
-          currentAssignment={currentAssignment}
-        />
-      )}
-
-      {view === 'submit' && (
-        <StudentSubmission 
-          currentAssignment={currentAssignment} 
-          setView={navigate} 
-          setGradingResult={setGradingResult}
-        />
-      )}
-
-      {view === 'grading' && (
-        <GradingResult 
-          gradingResult={gradingResult} 
-          setView={navigate} 
-        />
-      )}
+      {view === 'create' && <AssignmentCreate activeSeminar={activeSeminar} setView={navigate} refreshAssignments={refreshAssignments} />}
+      {view === 'submissions' && <SubmissionList submissionsList={submissionsList} setView={navigate} setGradingResult={setGradingResult} currentAssignment={currentAssignment} />}
+      {view === 'submit' && <StudentSubmission currentAssignment={currentAssignment} setView={navigate} setGradingResult={setGradingResult} />}
+      {view === 'grading' && <GradingResult gradingResult={gradingResult} setView={navigate} />}
 
       <ChatWidget /> 
     </div>
