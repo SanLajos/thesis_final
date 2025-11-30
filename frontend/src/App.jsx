@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'; //
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Code, HelpCircle, LogOut, ArrowLeft } from 'lucide-react';
-import { api } from './services/ApiService'; //
+import { api } from './services/ApiService';
 
 // --- Import Components ---
-import ChatWidget from './components/ChatWidget'; //
+import ChatWidget from './components/ChatWidget';
 
 // --- Import Pages ---
-import { Login, Register } from './pages/Login'; //
-import { SeminarList } from './pages/SeminarList'; //
-import { AssignmentDashboard } from './pages/AssignmentDashboard'; //
-import { AssignmentCreate } from './pages/AssignmentCreate'; //
-import { SubmissionList } from './pages/SubmissionList'; //
-import { StudentSubmission } from './pages/StudentSubmission'; //
-import { GradingResult } from './pages/GradingResult'; //
-import { AdminDashboard } from './pages/AdminDashboard'; //
-import { Help } from './pages/Help' //
+import { Login, Register } from './pages/Login';
+import { SeminarList } from './pages/SeminarList';
+import { AssignmentDashboard } from './pages/AssignmentDashboard';
+import { AssignmentCreate } from './pages/AssignmentCreate';
+import { SubmissionList } from './pages/SubmissionList';
+import { StudentSubmission } from './pages/StudentSubmission';
+import { GradingResult } from './pages/GradingResult';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { Help } from './pages/Help';
 
 // Main Wrapper for Router Context
 export default function App() {
@@ -155,6 +155,11 @@ function StructogramApp() {
             user && user.role === 'admin' ? 
             <AdminDashboard setView={compatibilitySetView} /> : 
             <Navigate to="/seminars" />
+        } />
+
+        {/* --- HELP ROUTE ADDED HERE --- */}
+        <Route path="/help" element={
+            user ? <Help setView={compatibilitySetView} /> : <Navigate to="/login" />
         } />
         
         <Route path="/dashboard" element={
