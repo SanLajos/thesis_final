@@ -1,6 +1,6 @@
 import os
 import requests
-from api_utils import post_with_retries
+from backend.core.api_utils import post_with_retries # Updated Import
 
 # Use a separate key if available, otherwise fallback to the main one
 CHAT_API_KEY = os.environ.get("GEMINI_CHAT_KEY", os.environ.get("GEMINI_API_KEY"))

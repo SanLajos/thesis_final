@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
-from code_generators import get_generator
+# Updated Import for the restructured project
+from backend.services.execution.generators import get_generator
 
 def parse_nassi_shneiderman_xml(file_path, language='python'):
     try:
@@ -7,12 +8,17 @@ def parse_nassi_shneiderman_xml(file_path, language='python'):
     except Exception as e:
         raise Exception(f"Failed to parse XML geometry: {e}")
     if not nodes: raise Exception("No blocks found in the diagram.")
+    
     root_nodes = _build_geometric_tree(nodes)
+    # Sort root nodes vertically (Top to Bottom execution)
     root_nodes.sort(key=lambda x: x['y'])
+    
     gen = get_generator(language)
     code_lines = gen.program_start()
+    
     for node in root_nodes:
         code_lines.extend(_generate_node_code(node, gen))
+        
     code_lines.extend(gen.program_end())
     return "\n".join(code_lines)
 
@@ -24,8 +30,10 @@ def _parse_xml_geometry(file_path):
         cell_id = cell.get('id')
         value = cell.get('value', '').strip()
         if not value: continue
+        
         geo = cell.find('mxGeometry')
         if geo is None: continue
+        
         try:
             nodes.append({
                 'id': cell_id, 'value': value,
@@ -37,27 +45,39 @@ def _parse_xml_geometry(file_path):
     return nodes
 
 def _build_geometric_tree(nodes):
+    # Sort by area (Smallest first) to find innermost children easily
     nodes.sort(key=lambda n: n['w'] * n['h'])
     roots = []
+    
     for i, inner in enumerate(nodes):
         parent = None
+        # Check against all larger nodes (which come after in the sorted list)
         for j in range(i + 1, len(nodes)):
             outer = nodes[j]
             if _is_fuzzy_inside(inner, outer):
                 outer['children'].append(inner)
                 parent = outer
                 break 
+        
         if parent is None: roots.append(inner)
+        
     return roots
 
 def _is_fuzzy_inside(inner, outer):
+    """
+    Determines if one block is visually nested inside another.
+    Uses an 80% intersection threshold to handle sloppy drawing.
+    """
     x_left = max(inner['x'], outer['x'])
     y_top = max(inner['y'], outer['y'])
     x_right = min(inner['x'] + inner['w'], outer['x'] + outer['w'])
     y_bottom = min(inner['y'] + inner['h'], outer['y'] + outer['h'])
+    
     if x_right < x_left or y_bottom < y_top: return False
+    
     intersection_area = (x_right - x_left) * (y_bottom - y_top)
     inner_area = inner['w'] * inner['h']
+    
     return (intersection_area / inner_area) > 0.8
 
 def _generate_node_code(node, gen, indent=1):
@@ -71,8 +91,7 @@ def _generate_node_code(node, gen, indent=1):
         for child in node['children']: lines.extend(_generate_node_code(child, gen, indent + 1))
         if gen.block_end(): lines.append(prefix + gen.block_end())
     
-    # 2. Handle Decisions (Expanded Logic)
-    # Checks for 'if', '?', '<', '>' but ensures it's not a print statement
+    # 2. Handle Decisions (Expanded Logic for ?, <, >)
     elif (val.startswith('if ') or '?' in val or '<' in val or '>' in val) and not (val.startswith('print ') or val.startswith('output ')):
         
         # Clean condition string

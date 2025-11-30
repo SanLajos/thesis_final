@@ -1,9 +1,8 @@
 import os
 import json
-import psycopg2
 from psycopg2.extras import RealDictCursor
 import xml.etree.ElementTree as ET
-from flask import Flask, request, jsonify, make_response, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -11,26 +10,27 @@ from flask_limiter.util import get_remote_address
 from pydantic import ValidationError
 import magic 
 
-# --- IMPORTS ---
-from flowchart_diagram_parser import parse_drawio_xml as parse_flowchart
-from nassi_shneiderman_parser import parse_nassi_shneiderman_xml as parse_ns
-from image_diagram_parser import parse_image_diagram
-from ai_grader import grade_with_ai
-from validation import (
-    AssignmentCreateSchema, AssignmentUpdateSchema, SubmissionCreateSchema, 
-    UserRegisterSchema, UserLoginSchema, SeminarCreateSchema, SeminarJoinSchema
+# --- UPDATED IMPORTS FOR RESTRUCTURED PROJECT ---
+from backend.services.parsers.flowchart import parse_drawio_xml as parse_flowchart
+from backend.services.parsers.nassi import parse_nassi_shneiderman_xml as parse_ns
+from backend.services.parsers.image import parse_image_diagram
+from backend.services.grading.ai_grader import grade_with_ai
+from backend.schemas.validation import (
+    AssignmentCreateSchema, SubmissionCreateSchema, 
+    UserRegisterSchema, UserLoginSchema, SeminarCreateSchema
 )
-from auth import hash_password, verify_password, decode_token, generate_tokens
-from complexity_analyzer import calculate_cyclomatic_complexity
-from plagiarism_detector import detect_plagiarism, extract_graph_signature
-from cfg_analyzer import analyze_flowchart_cfg
-from db_utils import get_db_connection
-from static_analysis_grader import analyze_code_style
-from keyword_grader import grade_with_keywords
-from execution_engine import run_test_cases
-from chatbot_engine import chat_with_tutor 
+from backend.core.auth import hash_password, verify_password, decode_token, generate_tokens
+from backend.services.analysis.complexity import calculate_cyclomatic_complexity
+from backend.services.analysis.plagiarism import detect_plagiarism, extract_graph_signature
+from backend.services.analysis.cfg import analyze_flowchart_cfg
+from backend.core.database import get_db_connection
+from backend.services.grading.static_analysis import analyze_code_style
+from backend.services.grading.keyword import grade_with_keywords
+from backend.services.execution.engine import run_test_cases
+from backend.services.chatbot import chat_with_tutor
 
 # --- CONFIGURATION ---
+# Paths are relative to the project root where you run the script
 UPLOAD_FOLDER = 'uploads'
 TEMPLATE_FOLDER = os.path.join(UPLOAD_FOLDER, 'templates')
 SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
@@ -38,6 +38,7 @@ SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
 for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
     os.makedirs(d, exist_ok=True)
 
+# Point static_folder to 'static' inside the 'backend' directory
 app = Flask(__name__, static_folder='static', static_url_path='/')
 
 # Robust CORS
@@ -51,21 +52,27 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 # --- HELPERS ---
 
 def get_current_user():
+    # Logic: Read ONLY from Authorization header (Bearer Token)
     auth_header = request.headers.get('Authorization')
     if not auth_header: return None
+    
     try:
+        # Header format: "Bearer <token>"
         token = auth_header.split(" ")[1]
     except IndexError:
         return None
+        
     return decode_token(token, verify_type='access')
 
 def validate_file_content(file_stream, expected_type):
+    # Validates file content using magic bytes
     header = file_stream.read(2048)
     file_stream.seek(0) 
     mime = magic.from_buffer(header, mime=True)
     if expected_type == 'image':
         if not mime.startswith('image/'): return False, f"Invalid file content. Expected image, got {mime}"
     elif expected_type == 'xml':
+        # XML mimes can vary
         valid_xml_mimes = ['text/xml', 'application/xml', 'text/plain'] 
         if mime not in valid_xml_mimes: return False, f"Invalid file content. Expected XML, got {mime}"
     return True, mime
@@ -95,7 +102,7 @@ def validate_code_safety(code, language):
 
 # --- ROUTES ---
 
-@app.route("/api/status") 
+@app.route("/api/status")
 def hello(): return "Backend server (Header Auth + Sandbox + Chatbot) is running!"
 
 @app.route('/auth/register', methods=['POST'])
@@ -515,6 +522,9 @@ def admin_delete_seminar(seminar_id):
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
     finally: cur.close(); conn.close()
 
+# --- FRONTEND SERVING ROUTE (NEW) ---
+# This handles the root URL "/" and any other URL not matched by API routes (like /dashboard, /login)
+# It ensures React router handles the navigation on the client side.
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):

@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 import re
-from code_generators import get_generator
+from backend.services.execution.generators import get_generator
 
 # --- IMPROVED LABEL MATCHING (REGEX) ---
 # Matches: yes, y, yep, yeah, true, t, 1, ok

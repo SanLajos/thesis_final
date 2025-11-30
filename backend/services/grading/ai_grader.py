@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from api_utils import post_with_retries
+from backend.core.api_utils import post_with_retries # Updated Import
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={API_KEY}"

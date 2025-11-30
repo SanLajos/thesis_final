@@ -2,7 +2,7 @@ import time
 import random
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from logger_config import logger # <--- Import Logger
+from backend.core.logger import logger # Updated Import
 
 DB_CONFIG = {
     "dbname": "thesis_project",
