@@ -94,7 +94,14 @@ npm run build
 # Deploy artifacts to Backend Static folder
 log "Deploying Frontend artifacts to Backend..."
 mkdir -p "$APP_DIR/backend/static"
-rm -rf "$APP_DIR/backend/static/*"
+# Clear existing assets (quotes are intentionally placed to allow globbing)
+rm -rf "$APP_DIR/backend/static"/*
+
+# Ensure the build actually produced output before copying
+if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+    error "Frontend build failed: 'dist' folder is missing or empty. Check npm output above."
+fi
+
 cp -r dist/* "$APP_DIR/backend/static/"
 
 # 6. Backend Setup
