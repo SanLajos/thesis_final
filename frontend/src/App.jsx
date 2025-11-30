@@ -14,6 +14,8 @@ import { AssignmentCreate } from './pages/AssignmentCreate'; //
 import { SubmissionList } from './pages/SubmissionList'; //
 import { StudentSubmission } from './pages/StudentSubmission'; //
 import { GradingResult } from './pages/GradingResult'; //
+import { AdminDashboard } from './pages/AdminDashboard'; //
+import { Help } from './pages/Help' //
 
 // Main Wrapper for Router Context
 export default function App() {
@@ -147,6 +149,12 @@ function StructogramApp() {
         {/* Protected Routes */}
         <Route path="/seminars" element={
             user ? <SeminarList setActiveSeminar={setActiveSeminar} setView={compatibilitySetView} user={user} /> : <Navigate to="/login" />
+        } />
+
+        <Route path="/admin" element={
+            user && user.role === 'admin' ? 
+            <AdminDashboard setView={compatibilitySetView} /> : 
+            <Navigate to="/seminars" />
         } />
         
         <Route path="/dashboard" element={
