@@ -34,6 +34,25 @@ from backend.services.chatbot import chat_with_tutor
 UPLOAD_FOLDER = 'uploads'
 TEMPLATE_FOLDER = os.path.join(UPLOAD_FOLDER, 'templates')
 SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
+# ... imports ...
+
+# --- CONFIGURATION ---
+# robust_path: Gets the directory where this main.py file lives (e.g., /opt/structogram_ai/backend)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+
+# Define paths relative to BASE_DIR, not the terminal's current folder
+UPLOAD_FOLDER = os.path.join(os.path.dirname(BASE_DIR), 'uploads') # ../uploads
+TEMPLATE_FOLDER = os.path.join(UPLOAD_FOLDER, 'templates')
+SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
+STATIC_FOLDER = os.path.join(BASE_DIR, 'static') # backend/static
+
+for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
+    os.makedirs(d, exist_ok=True)
+
+# Explicitly point Flask to the absolute path of the static folder
+app = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='/')
+
+# ... rest of the code ...
 
 for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
     os.makedirs(d, exist_ok=True)
