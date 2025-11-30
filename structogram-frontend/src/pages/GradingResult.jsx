@@ -1,10 +1,14 @@
 import React from 'react';
-import { CheckCircle, AlertCircle, Code } from 'lucide-react';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 import { Badge, LanguageBadge, ComplexityBadge, StaticAnalysisCard, TestResultsCard } from '../components/CommonUI';
+// 1. Import Syntax Highlighter
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'; // VS Code Dark Theme
 
 export const GradingResult = ({ gradingResult, setView }) => {
   if (!gradingResult) return null;
   const { grading_result, generated_code, method_used, language, complexity, plagiarism_score, static_analysis, test_results } = gradingResult;
+  
   return (
     <div className="max-w-5xl mx-auto space-y-6 pt-6">
       <button onClick={() => setView('dashboard')} className="text-slate-500">&larr; Back</button>
@@ -17,6 +21,7 @@ export const GradingResult = ({ gradingResult, setView }) => {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left Column: Analysis & Feedback */}
           <div className="space-y-4">
              <div className={`p-4 rounded border ${grading_result.is_correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                <h3 className="font-bold flex items-center gap-2">
@@ -29,10 +34,26 @@ export const GradingResult = ({ gradingResult, setView }) => {
              {static_analysis && <StaticAnalysisCard report={static_analysis} />}
              {test_results && <TestResultsCard results={test_results} />}
           </div>
+          
+          {/* Right Column: Code with Syntax Highlighting */}
           <div>
-            <div className="bg-slate-900 rounded-lg overflow-hidden h-full flex flex-col">
-              <div className="bg-slate-800 p-2 text-xs text-slate-400">Generated Code ({method_used})</div>
-              <pre className="p-4 text-green-400 font-mono text-sm overflow-auto flex-1">{generated_code}</pre>
+            <div className="rounded-lg overflow-hidden h-full flex flex-col border border-slate-200">
+              {/* Header using 'Biscay' Color */}
+              <div className="bg-[#1B3147] p-2 text-xs text-white flex justify-between items-center">
+                <span className="font-bold">Generated Code ({method_used})</span>
+                <span className="uppercase opacity-80 px-2 py-0.5 bg-white/10 rounded">{language}</span>
+              </div>
+              
+              {/* Syntax Highlighter Component */}
+              <SyntaxHighlighter 
+                language={language} 
+                style={vscDarkPlus} 
+                customStyle={{ margin: 0, height: '100%', fontSize: '0.85rem' }} 
+                showLineNumbers={true}
+                wrapLines={true}
+              >
+                {generated_code}
+              </SyntaxHighlighter>
             </div>
           </div>
         </div>
