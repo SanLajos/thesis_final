@@ -4,13 +4,6 @@ class ApiService {
     constructor() {
         this.token = localStorage.getItem('auth_token');
         this.refreshToken = localStorage.getItem('refresh_token');
-    } 
-}
-
-class ApiService {
-    constructor() {
-        this.token = localStorage.getItem('auth_token');
-        this.refreshToken = localStorage.getItem('refresh_token');
     }
 
     /**
@@ -116,7 +109,6 @@ class ApiService {
     }
     
     async uploadSubmission(assignmentId, formData) {
-        // isFile = true
         return this.request(`/submit/${assignmentId}`, 'POST', formData, true);
     }
 }
