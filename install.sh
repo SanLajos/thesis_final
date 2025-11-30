@@ -50,9 +50,23 @@ if [ ! -f "$APP_DIR/.env" ]; then
     echo "--------------------------------------------------------"
     echo " An API Key from Google Gemini is required for AI grading."
     echo "--------------------------------------------------------"
-    read -p "Enter your GEMINI_API_KEY: " INPUT_KEY
+    read -p "Enter your GEMINI_API_KEY (Main/Grading): " INPUT_KEY
     echo "GEMINI_API_KEY=$INPUT_KEY" > "$APP_DIR/.env"
-    log "API Key saved to .env"
+
+    echo ""
+    echo "--------------------------------------------------------"
+    echo " (Optional) Enter a separate key for the Chatbot."
+    echo " Press ENTER to reuse the Main Key."
+    echo "--------------------------------------------------------"
+    read -p "Enter your GEMINI_CHAT_KEY: " CHAT_KEY
+
+    # If user hits Enter (empty), use the main key
+    if [ -z "$CHAT_KEY" ]; then
+        CHAT_KEY="$INPUT_KEY"
+    fi
+    
+    echo "GEMINI_CHAT_KEY=$CHAT_KEY" >> "$APP_DIR/.env"
+    log "API Keys saved to .env"
 else
     info "Existing .env file found. Skipping API key prompt."
 fi
