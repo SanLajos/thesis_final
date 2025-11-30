@@ -23,7 +23,6 @@ from backend.core.auth import hash_password, verify_password, decode_token, gene
 from backend.services.analysis.complexity import calculate_cyclomatic_complexity
 from backend.services.analysis.plagiarism import detect_plagiarism, extract_graph_signature
 from backend.services.analysis.cfg import analyze_flowchart_cfg
-# UPDATED IMPORT: Added release_db_connection
 from backend.core.database import get_db_connection, release_db_connection
 from backend.services.grading.static_analysis import analyze_code_style
 from backend.services.grading.keyword import grade_with_keywords
@@ -41,7 +40,9 @@ STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
 for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
     os.makedirs(d, exist_ok=True)
 
-app = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='/')
+# CRITICAL FIX: Set static_url_path to something unused to prevent route collisions on '/'
+app = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='/_flask_static_ignore')
+
 CORS(app, resources={r"/*": {"origins": "*"}}, allow_headers=["Content-Type", "Authorization"])
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -121,7 +122,6 @@ def register():
         }), 201
 
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/auth/login', methods=['POST'])
@@ -147,7 +147,6 @@ def login():
             }), 200
             
         return jsonify({"error": "Invalid credentials"}), 401
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/auth/refresh', methods=['POST'])
@@ -201,7 +200,6 @@ def list_seminars():
     try:
         cur.execute("SELECT s.*, u.username as creator_name FROM seminars s JOIN seminar_members sm ON s.id=sm.seminar_id JOIN users u ON s.creator_id=u.id WHERE sm.user_id=%s ORDER BY s.created_at DESC", (u['user_id'],))
         return jsonify(cur.fetchall())
-    # ADDED: finally block to prevent leaks
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/seminar', methods=['POST'])
@@ -218,7 +216,6 @@ def create_seminar():
         cur.execute("INSERT INTO seminar_members (user_id, seminar_id) VALUES (%s,%s)", (u['user_id'], sid))
         conn.commit(); return jsonify({"message": "Created", "id": sid}), 201
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/seminar/join', methods=['POST'])
@@ -236,7 +233,6 @@ def join_seminar():
             cur.execute("INSERT INTO seminar_members (user_id, seminar_id) VALUES (%s,%s)", (u['user_id'], res[0]))
             conn.commit(); return jsonify({"message": "Joined"}), 200
         except: return jsonify({"message": "Already member"}), 200
-    # ADDED: finally block to prevent leaks
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/seminar/<int:seminar_id>/leave', methods=['POST'])
@@ -248,7 +244,6 @@ def leave_seminar(seminar_id):
         cur.execute("DELETE FROM seminar_members WHERE user_id = %s AND seminar_id = %s", (user['user_id'], seminar_id))
         conn.commit(); return jsonify({"message": "Left seminar"}), 200
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/assignments', methods=['GET'])
@@ -261,7 +256,6 @@ def list_assignments():
         if not cur.fetchone(): return jsonify({"error": "Access denied"}), 403
         cur.execute("SELECT * FROM assignments WHERE seminar_id=%s ORDER BY created_at DESC", (sid,))
         return jsonify(cur.fetchall())
-    # ADDED: finally block to prevent leaks
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/assignment', methods=['POST'])
@@ -291,7 +285,6 @@ def create_assignment():
         cur.execute("UPDATE assignments SET template_path = %s WHERE id = %s;", (template_path, assignment_id))
         conn.commit(); return jsonify({"message": "Created", "id": assignment_id}), 201
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/assignment/<int:assignment_id>', methods=['DELETE'])
@@ -313,7 +306,6 @@ def delete_assignment(assignment_id):
             if os.path.exists(sub['file_path']): os.remove(sub['file_path'])
         return jsonify({"message": "Deleted"}), 200
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/assignment/<int:aid>/submissions', methods=['GET'])
@@ -327,7 +319,6 @@ def list_assignment_submissions(aid):
         if u['role']!='admin' and a['creator_id']!=u['user_id']: return jsonify({"error": "Denied"}), 403
         cur.execute("SELECT * FROM submissions WHERE assignment_id=%s ORDER BY created_at DESC", (aid,))
         return jsonify(cur.fetchall())
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/assignment/<int:assignment_id>/my-submissions', methods=['GET'])
@@ -338,7 +329,6 @@ def get_my_submissions(assignment_id):
     try:
         cur.execute("""SELECT id, created_at, submission_mode, grading_result, plagiarism_score, complexity, generated_code, test_results, static_analysis_report FROM submissions WHERE assignment_id = %s AND student_id = %s ORDER BY created_at DESC""", (assignment_id, user['user_id']))
         return jsonify(cur.fetchall())
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/submit/<int:assignment_id>', methods=['POST'])
@@ -446,7 +436,6 @@ def submit_for_grading(assignment_id):
             "test_results": test_results
         }), 200
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/seminar/<int:sid>/analytics', methods=['GET'])
@@ -468,7 +457,6 @@ def analytics(sid):
         cur.execute("""SELECT u.username, AVG(CAST(s.grading_result->>'score' AS INT)) as avg_grade, COUNT(s.id) as submissions FROM users u JOIN seminar_members sm ON u.id=sm.user_id LEFT JOIN submissions s ON u.id=s.student_id JOIN assignments a ON s.assignment_id=a.id WHERE sm.seminar_id=%s AND u.role='student' GROUP BY u.id HAVING AVG(CAST(s.grading_result->>'score' AS INT)) < 70 LIMIT 5""", (sid,))
         risk = cur.fetchall()
         return jsonify({"student_count": sc, "assignment_count": ac, "assignment_performance": perf, "grade_distribution": dist, "at_risk_students": risk})
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/admin/stats', methods=['GET'])
@@ -484,7 +472,6 @@ def admin_stats():
         cur.execute("SELECT COUNT(*) as count FROM submissions")
         subc = cur.fetchone()['count']
         return jsonify({"users": uc, "seminars": sc, "submissions": subc})
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/admin/users', methods=['GET'])
@@ -495,7 +482,6 @@ def admin_list_users():
     try:
         cur.execute("SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC")
         return jsonify(cur.fetchall())
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/admin/user/<int:user_id>', methods=['DELETE'])
@@ -507,7 +493,6 @@ def admin_delete_user(user_id):
         cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
         conn.commit(); return jsonify({"message": "User deleted"})
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/admin/seminars', methods=['GET'])
@@ -518,7 +503,6 @@ def admin_list_seminars():
     try:
         cur.execute("""SELECT s.id, s.title, s.invite_code, s.created_at, u.username as creator FROM seminars s JOIN users u ON s.creator_id = u.id ORDER BY s.created_at DESC""")
         return jsonify(cur.fetchall())
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
 @app.route('/admin/seminar/<int:seminar_id>', methods=['DELETE'])
@@ -530,18 +514,23 @@ def admin_delete_seminar(seminar_id):
         cur.execute("DELETE FROM seminars WHERE id = %s", (seminar_id,))
         conn.commit(); return jsonify({"message": "Seminar deleted"})
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
-    # CHANGED: release_db_connection
     finally: cur.close(); release_db_connection(conn)
 
-# --- FRONTEND CATCH-ALL ROUTE ---
-# Serves React Frontend for any route not matched by the API
+# --- FRONTEND SERVING (FIXED) ---
+
+# 1. Serve Static Assets (CSS, JS, Images)
+@app.route('/assets/<path:path>')
+def serve_assets(path):
+    return send_from_directory(os.path.join(app.static_folder, 'assets'), path)
+
+# 2. Catch-All Route for React Router
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+    if path and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
-    else:
-        return send_from_directory(app.static_folder, 'index.html')
+    # Fallback for SPA routing
+    return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
