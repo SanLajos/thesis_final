@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/ApiService';
-// 1. Import the Toast Hook
 import { useToast } from '../context/ToastContext';
 
 export const SeminarList = ({ setActiveSeminar, setView, user }) => {
-  // 2. Destructure addToast
   const { addToast } = useToast();
   
   const [seminars, setSeminars] = useState([]);
@@ -13,45 +11,55 @@ export const SeminarList = ({ setActiveSeminar, setView, user }) => {
   const [newSem, setNewSem] = useState({title:'', invite_code:''});
 
   useEffect(() => { 
-    api.request('/seminars').then(res => { if(res.ok) setSeminars(res.data); }); 
-  }, []);
+    // ADDED: Error handling for initial fetch
+    const fetchSeminars = async () => {
+        try {
+            const res = await api.request('/seminars'); 
+            if(res.ok) setSeminars(res.data);
+            else addToast("Could not load seminars", "error");
+        } catch (e) {
+            addToast("Network Error: Is the backend running?", "error");
+        }
+    };
+    fetchSeminars();
+  }, []); // Empty dependency array ok
 
   const join = async () => { 
     if(!joinCode) return; 
-    const res = await api.request('/seminar/join', 'POST', {invite_code: joinCode}); 
-    
-    if(res.ok){ 
-      // 3. Success Notification
-      addToast("Successfully joined seminar!", "success");
-      
-      const listRes = await api.request('/seminars');
-      if(listRes.ok) setSeminars(listRes.data); 
-      setJoinCode(''); 
-    } else {
-      // 4. Error Notification (Replaces alert)
-      addToast(res.data.error || "Failed to join seminar. Please check the code.", "error"); 
+    try {
+        const res = await api.request('/seminar/join', 'POST', {invite_code: joinCode}); 
+        if(res.ok){ 
+          addToast("Successfully joined seminar!", "success");
+          // Refresh list
+          const listRes = await api.request('/seminars');
+          if(listRes.ok) setSeminars(listRes.data); 
+          setJoinCode(''); 
+        } else {
+          addToast(res.data.error || "Failed to join seminar.", "error"); 
+        }
+    } catch (e) {
+        addToast("Network Error during join", "error");
     }
   };
 
   const create = async () => { 
-    // Basic validation
     if (!newSem.title || !newSem.invite_code) {
         addToast("Please fill in both Title and Invite Code", "info");
         return;
     }
-
-    const res = await api.request('/seminar', 'POST', newSem); 
-    
-    if(res.ok){ 
-      addToast("Seminar created successfully!", "success");
-      
-      const listRes = await api.request('/seminars');
-      if(listRes.ok) setSeminars(listRes.data); 
-      setShowCreate(false); 
-      setNewSem({title:'', invite_code:''}); // Reset form
-    } else {
-      // 5. Error Notification (Replaces alert)
-      addToast(res.data.error || "Failed to create seminar", "error"); 
+    try {
+        const res = await api.request('/seminar', 'POST', newSem); 
+        if(res.ok){ 
+          addToast("Seminar created successfully!", "success");
+          const listRes = await api.request('/seminars');
+          if(listRes.ok) setSeminars(listRes.data); 
+          setShowCreate(false); 
+          setNewSem({title:'', invite_code:''}); 
+        } else {
+          addToast(res.data.error || "Failed to create seminar", "error"); 
+        }
+    } catch (e) {
+        addToast("Network Error during creation", "error");
     }
   };
 
@@ -61,7 +69,6 @@ export const SeminarList = ({ setActiveSeminar, setView, user }) => {
         <h2 className="text-2xl font-bold">My Seminars</h2>
         <div className="flex gap-2">
           <input value={joinCode} onChange={e=>setJoinCode(e.target.value)} placeholder="Invite Code" className="border p-2 rounded outline-none focus:border-[#40E0D0]"/>
-          {/* Updated button color to match new Biscay theme */}
           <button onClick={join} className="bg-[#1B3147] hover:bg-[#243b55] text-white px-4 rounded transition-colors">Join</button>
           {user.role === 'teacher' && <button onClick={()=>setShowCreate(!showCreate)} className="bg-green-600 hover:bg-green-700 text-white px-4 rounded transition-colors">Create</button>}
         </div>
