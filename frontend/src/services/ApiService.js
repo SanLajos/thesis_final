@@ -1,4 +1,11 @@
-const API_BASE = "http://127.0.0.1:5000";
+const API_BASE = ""; // Relative path automatically uses current origin
+
+class ApiService {
+    constructor() {
+        this.token = localStorage.getItem('auth_token');
+        this.refreshToken = localStorage.getItem('refresh_token');
+    } 
+}
 
 class ApiService {
     constructor() {

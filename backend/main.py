@@ -1,5 +1,6 @@
 import os
 import json
+import magic 
 from psycopg2.extras import RealDictCursor
 import xml.etree.ElementTree as ET
 from flask import Flask, request, jsonify, send_from_directory
@@ -8,9 +9,8 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from pydantic import ValidationError
-import magic 
 
-# --- UPDATED IMPORTS FOR RESTRUCTURED PROJECT ---
+# --- IMPORTS ---
 from backend.services.parsers.flowchart import parse_drawio_xml as parse_flowchart
 from backend.services.parsers.nassi import parse_nassi_shneiderman_xml as parse_ns
 from backend.services.parsers.image import parse_image_diagram
@@ -30,35 +30,25 @@ from backend.services.execution.engine import run_test_cases
 from backend.services.chatbot import chat_with_tutor
 
 # --- CONFIGURATION ---
-# Paths are relative to the project root where you run the script
-UPLOAD_FOLDER = 'uploads'
+# Get the absolute path of the directory containing this file (backend/)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Define paths relative to BASE_DIR
+# Assuming structure: /project/backend/main.py -> /project/uploads
+PROJECT_ROOT = os.path.dirname(BASE_DIR) 
+UPLOAD_FOLDER = os.path.join(PROJECT_ROOT, 'uploads')
 TEMPLATE_FOLDER = os.path.join(UPLOAD_FOLDER, 'templates')
 SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
-# ... imports ...
 
-# --- CONFIGURATION ---
-# robust_path: Gets the directory where this main.py file lives (e.g., /opt/structogram_ai/backend)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+# Static folder is strictly inside backend/static
+STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
 
-# Define paths relative to BASE_DIR, not the terminal's current folder
-UPLOAD_FOLDER = os.path.join(os.path.dirname(BASE_DIR), 'uploads') # ../uploads
-TEMPLATE_FOLDER = os.path.join(UPLOAD_FOLDER, 'templates')
-SUBMISSION_FOLDER = os.path.join(UPLOAD_FOLDER, 'submissions')
-STATIC_FOLDER = os.path.join(BASE_DIR, 'static') # backend/static
-
+# Ensure directories exist
 for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
     os.makedirs(d, exist_ok=True)
 
-# Explicitly point Flask to the absolute path of the static folder
+# Initialize Flask with the ABSOLUTE path to the static folder
 app = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='/')
-
-# ... rest of the code ...
-
-for d in [UPLOAD_FOLDER, TEMPLATE_FOLDER, SUBMISSION_FOLDER]:
-    os.makedirs(d, exist_ok=True)
-
-# Point static_folder to 'static' inside the 'backend' directory
-app = Flask(__name__, static_folder='static', static_url_path='/')
 
 # Robust CORS
 CORS(app, resources={r"/*": {"origins": "*"}}, allow_headers=["Content-Type", "Authorization"])
@@ -71,27 +61,21 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 # --- HELPERS ---
 
 def get_current_user():
-    # Logic: Read ONLY from Authorization header (Bearer Token)
     auth_header = request.headers.get('Authorization')
     if not auth_header: return None
-    
     try:
-        # Header format: "Bearer <token>"
         token = auth_header.split(" ")[1]
     except IndexError:
         return None
-        
     return decode_token(token, verify_type='access')
 
 def validate_file_content(file_stream, expected_type):
-    # Validates file content using magic bytes
     header = file_stream.read(2048)
     file_stream.seek(0) 
     mime = magic.from_buffer(header, mime=True)
     if expected_type == 'image':
         if not mime.startswith('image/'): return False, f"Invalid file content. Expected image, got {mime}"
     elif expected_type == 'xml':
-        # XML mimes can vary
         valid_xml_mimes = ['text/xml', 'application/xml', 'text/plain'] 
         if mime not in valid_xml_mimes: return False, f"Invalid file content. Expected XML, got {mime}"
     return True, mime
@@ -103,16 +87,11 @@ def detect_diagram_type(file_path):
     except: return 'flowchart'
 
 def validate_code_safety(code, language):
-    """
-    Basic security filter to prevent execution of dangerous commands.
-    This prevents students from submitting diagrams that generate malicious code.
-    """
     forbidden_patterns = {
         'python': ['import os', 'import sys', 'import subprocess', 'from os', 'from sys', 'exec(', 'eval(', 'open(', '__import__', 'os.system'],
         'cpp': ['system(', 'popen(', 'fork(', 'execv', 'execl', '<cstdlib>'],
         'java': ['Runtime.getRuntime', 'ProcessBuilder', 'System.exit']
     }
-    
     patterns = forbidden_patterns.get(language, [])
     for pattern in patterns:
         if pattern in code:
@@ -218,7 +197,6 @@ def chat():
     if not isinstance(history, list): history = []
         
     response = chat_with_tutor(message, history)
-    
     if 'error' in response: return jsonify(response), 500
     return jsonify(response), 200
 
@@ -409,8 +387,7 @@ def submit_for_grading(assignment_id):
         # --- SECURITY CHECK ---
         is_safe, unsafe_keyword = validate_code_safety(generated_code, target_language)
         if not is_safe:
-            # We explicitly reject the submission and do not run it.
-            conn.rollback() # Or we could commit the record but mark it as failed. Here we choose to fail the request.
+            conn.rollback()
             return jsonify({"error": f"Security Violation: Your diagram produces code with forbidden keyword '{unsafe_keyword}'."}), 400
 
         static_report = None
@@ -541,13 +518,12 @@ def admin_delete_seminar(seminar_id):
     except Exception as e: conn.rollback(); return jsonify({"error": str(e)}), 500
     finally: cur.close(); conn.close()
 
-# --- FRONTEND SERVING ROUTE (NEW) ---
-# This handles the root URL "/" and any other URL not matched by API routes (like /dashboard, /login)
-# It ensures React router handles the navigation on the client side.
+# --- FRONTEND CATCH-ALL ROUTE ---
+# Serves React Frontend for any route not matched by the API
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
-    if path != "" and os.path.exists(app.static_folder + '/' + path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
         return send_from_directory(app.static_folder, 'index.html')
