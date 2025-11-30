@@ -7,6 +7,8 @@
 APP_DIR=$(dirname "$(realpath "$0")")
 PYTHON_ENV="$APP_DIR/venv"
 ENV_FILE="$APP_DIR/.env"
+FRONTEND_DIR="$APP_DIR/frontend"
+ASSETS_DIR="$APP_DIR/backend/static"
 
 # Colors
 GREEN='\033[0;32m'
