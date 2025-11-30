@@ -1,7 +1,7 @@
 import pytest
-from code_generators import get_generator
-from complexity_analyzer import calculate_cyclomatic_complexity
-from plagiarism_detector import detect_plagiarism, calculate_jaccard_similarity
+from backend.services.execution.generators import get_generator
+from backend.services.analysis.complexity import calculate_cyclomatic_complexity
+from backend.services.analysis.plagiarism import detect_plagiarism, calculate_jaccard_similarity
 
 # --- 1. CODE GENERATOR TESTS ---
 

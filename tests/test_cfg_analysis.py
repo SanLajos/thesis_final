@@ -1,5 +1,5 @@
 import pytest
-from cfg_analyzer import analyze_flowchart_cfg
+from backend.services.analysis.cfg import analyze_flowchart_cfg
 
 def test_cfg_basic_flow():
     # A simple linear flow: Start -> Step1 -> End

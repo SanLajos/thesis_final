@@ -1,6 +1,6 @@
 import pytest
-from keyword_grader import grade_with_keywords
-from static_analysis_grader import analyze_code_style, calculate_halstead_metrics
+from backend.services.grading.keyword import grade_with_keywords
+from backend.services.grading.static_analysis import analyze_code_style, calculate_halstead_metrics
 
 # --- KEYWORD GRADER TESTS ---
 

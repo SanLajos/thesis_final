@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from validation import UserRegisterSchema, AssignmentCreateSchema, SubmissionCreateSchema
+from backend.schemas.validation import UserRegisterSchema, AssignmentCreateSchema, SubmissionCreateSchema
 
 def test_user_registration_valid():
     user = UserRegisterSchema(
