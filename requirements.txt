@@ -4,6 +4,7 @@ flask-limiter>=3.5.0
 psycopg2-binary>=2.9.9
 requests>=2.31.0
 pydantic>=2.5.3
+email-validator>=2.0.0
 gunicorn>=21.2.0
 python-magic>=0.4.27
 google-generativeai>=0.3.2
