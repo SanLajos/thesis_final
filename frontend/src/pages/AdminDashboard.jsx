@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/ApiService';
-import { useToast } from '../context/ToastContext';
 import { Trash2, Users, BookOpen, FileText, ShieldAlert } from 'lucide-react';
 
 export const AdminDashboard = ({ setView }) => {
-  const { addToast } = useToast();
   const [stats, setStats] = useState({ users: 0, seminars: 0, submissions: 0 });
   const [users, setUsers] = useState([]);
   const [seminars, setSeminars] = useState([]);
@@ -27,7 +25,7 @@ export const AdminDashboard = ({ setView }) => {
       if (usersRes.ok) setUsers(usersRes.data);
       if (semRes.ok) setSeminars(semRes.data);
     } catch (e) {
-      addToast("Failed to load admin data", "error");
+      alert("Failed to load admin data");
     } finally {
       setLoading(false);
     }
@@ -37,11 +35,11 @@ export const AdminDashboard = ({ setView }) => {
     if (!window.confirm("Are you sure? This will delete all their submissions.")) return;
     const res = await api.request(`/admin/user/${id}`, 'DELETE');
     if (res.ok) {
-      addToast("User deleted permanently", "success");
+      alert("User deleted permanently");
       setUsers(users.filter(u => u.id !== id));
       setStats(prev => ({ ...prev, users: prev.users - 1 }));
     } else {
-      addToast(res.data.error || "Delete failed", "error");
+      alert(res.data.error || "Delete failed");
     }
   };
 
@@ -49,7 +47,7 @@ export const AdminDashboard = ({ setView }) => {
     if (!window.confirm("Delete seminar? All assignments will be lost.")) return;
     const res = await api.request(`/admin/seminar/${id}`, 'DELETE');
     if (res.ok) {
-      addToast("Seminar deleted", "success");
+      alert("Seminar deleted");
       setSeminars(seminars.filter(s => s.id !== id));
       setStats(prev => ({ ...prev, seminars: prev.seminars - 1 }));
     }

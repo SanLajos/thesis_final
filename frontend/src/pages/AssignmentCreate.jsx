@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/ApiService';
-import { useToast } from '../context/ToastContext'; // Import Hook
 
 export const AssignmentCreate = ({ activeSeminar, setView, refreshAssignments }) => {
-  const { addToast } = useToast(); // Destructure
   const [formData, setFormData] = useState({
     title: '', description: '', grading_prompt: '', 
     language: 'python', grading_type: 'ai',
@@ -21,7 +19,7 @@ export const AssignmentCreate = ({ activeSeminar, setView, refreshAssignments })
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title || !file) {
-        addToast("Please fill in title and upload a template file", "error");
+        alert("Please fill in title and upload a template file");
         return;
     }
 
@@ -33,11 +31,11 @@ export const AssignmentCreate = ({ activeSeminar, setView, refreshAssignments })
 
     const res = await api.request('/assignment', 'POST', payload, true);
     if (res.ok) { 
-      addToast("Assignment created successfully!", "success"); // Success Toast
+      alert("Assignment created successfully!");
       refreshAssignments(); 
       setView('dashboard'); 
     } else {
-      addToast(res.data.error || "Failed to create assignment", "error"); // Error Toast
+      alert(res.data.error || "Failed to create assignment");
     }
   };
 

@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/ApiService';
-import { useToast } from '../context/ToastContext';
 
 export const SeminarList = ({ setActiveSeminar, setView, user }) => {
-  const { addToast } = useToast();
   
   const [seminars, setSeminars] = useState([]);
   const [joinCode, setJoinCode] = useState('');
@@ -16,9 +14,9 @@ export const SeminarList = ({ setActiveSeminar, setView, user }) => {
         try {
             const res = await api.request('/seminars'); 
             if(res.ok) setSeminars(res.data);
-            else addToast("Could not load seminars", "error");
+            else alert("Could not load seminars");
         } catch (e) {
-            addToast("Network Error: Is the backend running?", "error");
+            alert("Network Error: Is the backend running?");
         }
     };
     fetchSeminars();
@@ -29,37 +27,37 @@ export const SeminarList = ({ setActiveSeminar, setView, user }) => {
     try {
         const res = await api.request('/seminar/join', 'POST', {invite_code: joinCode}); 
         if(res.ok){ 
-          addToast("Successfully joined seminar!", "success");
+          alert("Successfully joined seminar!");
           // Refresh list
           const listRes = await api.request('/seminars');
           if(listRes.ok) setSeminars(listRes.data); 
           setJoinCode(''); 
         } else {
-          addToast(res.data.error || "Failed to join seminar.", "error"); 
+          alert(res.data.error || "Failed to join seminar."); 
         }
     } catch (e) {
-        addToast("Network Error during join", "error");
+        alert("Network Error during join");
     }
   };
 
   const create = async () => { 
     if (!newSem.title || !newSem.invite_code) {
-        addToast("Please fill in both Title and Invite Code", "info");
+        alert("Please fill in both Title and Invite Code");
         return;
     }
     try {
         const res = await api.request('/seminar', 'POST', newSem); 
         if(res.ok){ 
-          addToast("Seminar created successfully!", "success");
+          alert("Seminar created successfully!");
           const listRes = await api.request('/seminars');
           if(listRes.ok) setSeminars(listRes.data); 
           setShowCreate(false); 
           setNewSem({title:'', invite_code:''}); 
         } else {
-          addToast(res.data.error || "Failed to create seminar", "error"); 
+          alert(res.data.error || "Failed to create seminar"); 
         }
     } catch (e) {
-        addToast("Network Error during creation", "error");
+        alert("Network Error during creation");
     }
   };
 

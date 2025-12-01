@@ -1,11 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { api } from '../services/ApiService';
 import { RefreshCw, UploadCloud, File, X } from 'lucide-react'; // Added icons
-import { useToast } from '../context/ToastContext';
 import { useDropzone } from 'react-dropzone'; // 1. Import Dropzone Hook
 
 export const StudentSubmission = ({ currentAssignment, setView, setGradingResult }) => {
-  const { addToast } = useToast();
   const [mode, setMode] = useState('xml');
   const [xmlType, setXmlType] = useState('flowchart');
   const [description, setDescription] = useState('');
@@ -16,9 +14,9 @@ export const StudentSubmission = ({ currentAssignment, setView, setGradingResult
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles?.length > 0) {
       setFile(acceptedFiles[0]);
-      addToast("File selected!", "success");
+      alert("File selected!");
     }
-  }, [addToast]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop, 
@@ -31,7 +29,7 @@ export const StudentSubmission = ({ currentAssignment, setView, setGradingResult
   const handleSubmit = async (e) => {
     e.preventDefault(); 
     if(!file) {
-        addToast("Please upload a file first.", "error");
+        alert("Please upload a file first.");
         return;
     }
     setLoading(true);
@@ -45,9 +43,9 @@ export const StudentSubmission = ({ currentAssignment, setView, setGradingResult
     try {
       const res = await api.request(`/submit/${currentAssignment.id}`, 'POST', formData, true);
       if (!res.ok) { 
-        addToast("Submission Failed: " + (res.data.error || "Unknown"), "error");
+        alert("Submission Failed: " + (res.data.error || "Unknown"));
       } else { 
-        addToast("Grading complete!", "success");
+        alert("Grading complete!");
         const data = res.data;
         setGradingResult({
             ...data,
@@ -58,7 +56,7 @@ export const StudentSubmission = ({ currentAssignment, setView, setGradingResult
         setView('grading'); 
       }
     } catch (err) { 
-        addToast("Network Error: Could not submit.", "error"); 
+        alert("Network Error: Could not submit."); 
     } finally { 
         setLoading(false); 
     }
