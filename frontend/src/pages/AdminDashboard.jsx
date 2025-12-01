@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/ApiService';
-import { Trash2, Users, BookOpen, FileText, ShieldAlert } from 'lucide-react';
+import { Trash2, Users, BookOpen, FileText } from 'lucide-react';
 
 export const AdminDashboard = ({ setView }) => {
   const [stats, setStats] = useState({ users: 0, seminars: 0, submissions: 0 });
