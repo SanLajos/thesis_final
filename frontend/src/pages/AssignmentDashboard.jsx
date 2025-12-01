@@ -1,6 +1,6 @@
 import React from 'react';
 import { api } from '../services/ApiService';
-import { Plus, Trash2, Eye } from 'lucide-react';
+import { Plus, Trash2, Eye, History } from 'lucide-react'; // Added History icon
 import { LanguageBadge } from '../components/CommonUI';
 
 export const AssignmentDashboard = ({ activeSeminar, setView, user, assignments, setAssignments, setCurrentAssignment, fetchSubmissions }) => {
@@ -35,7 +35,26 @@ export const AssignmentDashboard = ({ activeSeminar, setView, user, assignments,
                 <p className="text-sm text-gray-600 my-2 line-clamp-2">{a.description}</p>
                 <div className="flex justify-between items-center mt-4">
                   <LanguageBadge lang={a.language} />
-                  {user.role === 'student' && <button onClick={()=>{setCurrentAssignment(a); setView('submit')}} className="bg-blue-100 text-blue-600 px-4 py-1 rounded text-sm font-bold hover:bg-blue-200">Start</button>}
+                  
+                  {/* --- CHANGED SECTION FOR STUDENTS --- */}
+                  {user.role === 'student' && (
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={()=>{setCurrentAssignment(a); setView('history')}} 
+                            className="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded text-sm font-medium hover:bg-slate-50 flex items-center gap-1"
+                        >
+                            <History size={14}/> History
+                        </button>
+                        <button 
+                            onClick={()=>{setCurrentAssignment(a); setView('submit')}} 
+                            className="bg-blue-100 text-blue-600 px-4 py-1 rounded text-sm font-bold hover:bg-blue-200"
+                        >
+                            Start
+                        </button>
+                    </div>
+                  )}
+                  {/* ------------------------------------ */}
+
                 </div>
               </div>
             ))}

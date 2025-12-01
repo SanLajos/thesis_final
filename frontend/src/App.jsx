@@ -23,6 +23,7 @@ import { StudentSubmission } from './pages/StudentSubmission';
 import { GradingResult } from './pages/GradingResult';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { Help } from './pages/Help';
+import { StudentHistory } from './pages/StudentHistory'; // <--- NEW IMPORT
 
 // Main Wrapper for Router Context
 export default function App() {
@@ -54,7 +55,6 @@ function StructogramApp() {
         const res = await api.getMe();
         if (res.ok) {
           setUser(res.data.user);
-          // If on root or auth pages, go to seminars
           if (['/', '/login', '/register'].includes(location.pathname)) {
             navigate('/seminars');
           }
@@ -64,7 +64,6 @@ function StructogramApp() {
           navigate('/login');
         }
       } else {
-        // If not on a public route, force login
         if (!['/login', '/register'].includes(location.pathname)) {
           navigate('/login');
         }
@@ -113,7 +112,6 @@ function StructogramApp() {
   };
 
   // --- COMPATIBILITY ADAPTER ---
-  // Allows child components to keep using setView('dashboard') etc.
   const compatibilitySetView = (viewName) => {
     const routes = {
       login: '/login',
@@ -126,6 +124,7 @@ function StructogramApp() {
       grading: '/grading',
       admin: '/admin',
       help: '/help',
+      history: '/history', // <--- NEW ROUTE MAPPING
     };
     navigate(routes[viewName] || '/seminars');
   };
@@ -140,7 +139,6 @@ function StructogramApp() {
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
-      {/* Navbar - Only show if logged in */}
       {user && (
         <nav className="bg-[#1B3147] text-white p-4 shadow-md mb-6 flex justify-between transition-colors">
           <div className="flex items-center gap-4">
@@ -192,7 +190,6 @@ function StructogramApp() {
 
       {/* --- ROUTES --- */}
       <Routes>
-        {/* Auth */}
         <Route
           path="/login"
           element={
@@ -212,7 +209,6 @@ function StructogramApp() {
           }
         />
 
-        {/* Protected Routes */}
         <Route
           path="/seminars"
           element={
@@ -284,7 +280,6 @@ function StructogramApp() {
           }
         />
 
-        {/* NOTE: now require currentAssignment, not just user */}
         <Route
           path="/submissions"
           element={
@@ -330,7 +325,23 @@ function StructogramApp() {
           }
         />
 
-        {/* Fallback */}
+        {/* --- NEW ROUTE FOR STUDENT HISTORY --- */}
+        <Route
+          path="/history"
+          element={
+            user && currentAssignment ? (
+              <StudentHistory
+                currentAssignment={currentAssignment}
+                setView={compatibilitySetView}
+                setGradingResult={setGradingResult}
+                user={user}
+              />
+            ) : (
+              <Navigate to="/dashboard" />
+            )
+          }
+        />
+
         <Route
           path="*"
           element={<Navigate to={user ? '/seminars' : '/login'} />}
