@@ -366,7 +366,8 @@ def submit_for_grading(assignment_id):
         generated_code = ""; used_method = ""; complexity_score = 1
         dead_code_report = []; uninit_vars_report = []; graph_signature = None
 
-        if validated_data.submission_mode == 'image' or (validated_data.submission_mode == 'auto' and is_image_ext):
+        # --- MODIFIED LOGIC: TRUST FILE EXTENSION OVER USER INPUT ---
+        if is_image_ext:
             used_method = "ai_vision"
             generated_code = parse_image_diagram(submission_path, validated_data.description, language=target_language)
             complexity_score = calculate_cyclomatic_complexity(generated_code, language=target_language)
