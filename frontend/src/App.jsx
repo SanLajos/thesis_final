@@ -23,7 +23,8 @@ import { StudentSubmission } from './pages/StudentSubmission';
 import { GradingResult } from './pages/GradingResult';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { Help } from './pages/Help';
-import { StudentHistory } from './pages/StudentHistory'; // <--- NEW IMPORT
+import { StudentHistory } from './pages/StudentHistory';
+import { SeminarAnalytics } from './pages/SeminarAnalytics'; // <--- NEW IMPORT
 
 // Main Wrapper for Router Context
 export default function App() {
@@ -124,7 +125,8 @@ function StructogramApp() {
       grading: '/grading',
       admin: '/admin',
       help: '/help',
-      history: '/history', // <--- NEW ROUTE MAPPING
+      history: '/history',
+      analytics: '/analytics', // <--- NEW ROUTE MAPPING
     };
     navigate(routes[viewName] || '/seminars');
   };
@@ -325,7 +327,6 @@ function StructogramApp() {
           }
         />
 
-        {/* --- NEW ROUTE FOR STUDENT HISTORY --- */}
         <Route
           path="/history"
           element={
@@ -335,6 +336,21 @@ function StructogramApp() {
                 setView={compatibilitySetView}
                 setGradingResult={setGradingResult}
                 user={user}
+              />
+            ) : (
+              <Navigate to="/dashboard" />
+            )
+          }
+        />
+
+        {/* --- NEW ROUTE FOR SEMINAR ANALYTICS --- */}
+        <Route
+          path="/analytics"
+          element={
+            user && activeSeminar ? (
+              <SeminarAnalytics
+                activeSeminar={activeSeminar}
+                setView={compatibilitySetView}
               />
             ) : (
               <Navigate to="/dashboard" />

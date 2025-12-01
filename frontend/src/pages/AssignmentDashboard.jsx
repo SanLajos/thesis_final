@@ -1,6 +1,6 @@
 import React from 'react';
 import { api } from '../services/ApiService';
-import { Plus, Trash2, Eye, History } from 'lucide-react'; // Added History icon
+import { Plus, Trash2, Eye, History, BarChart2 } from 'lucide-react'; // Added BarChart2 icon
 import { LanguageBadge } from '../components/CommonUI';
 
 export const AssignmentDashboard = ({ activeSeminar, setView, user, assignments, setAssignments, setCurrentAssignment, fetchSubmissions }) => {
@@ -16,7 +16,26 @@ export const AssignmentDashboard = ({ activeSeminar, setView, user, assignments,
           <div className="flex justify-between items-center">
             <button onClick={()=>setView('seminars')} className="text-gray-500 hover:text-black">&larr; Back</button>
             <h2 className="text-2xl font-bold">{activeSeminar.title}</h2>
-            {user.role === 'teacher' && <button onClick={()=>setView('create')} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2"><Plus size={16}/> New Assignment</button>}
+            
+            {/* --- UPDATED TEACHER CONTROLS --- */}
+            {user.role === 'teacher' && (
+              <div className="flex gap-2">
+                <button 
+                    onClick={() => setView('analytics')} 
+                    className="bg-purple-100 text-purple-700 px-4 py-2 rounded flex items-center gap-2 hover:bg-purple-200 transition-colors font-semibold"
+                >
+                    <BarChart2 size={18}/> Analytics
+                </button>
+                <button 
+                    onClick={() => setView('create')} 
+                    className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-sm font-semibold"
+                >
+                    <Plus size={18}/> New Assignment
+                </button>
+              </div>
+            )}
+            {/* -------------------------------- */}
+            
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {assignments.map(a => (
@@ -35,26 +54,12 @@ export const AssignmentDashboard = ({ activeSeminar, setView, user, assignments,
                 <p className="text-sm text-gray-600 my-2 line-clamp-2">{a.description}</p>
                 <div className="flex justify-between items-center mt-4">
                   <LanguageBadge lang={a.language} />
-                  
-                  {/* --- CHANGED SECTION FOR STUDENTS --- */}
                   {user.role === 'student' && (
                     <div className="flex gap-2">
-                        <button 
-                            onClick={()=>{setCurrentAssignment(a); setView('history')}} 
-                            className="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded text-sm font-medium hover:bg-slate-50 flex items-center gap-1"
-                        >
-                            <History size={14}/> History
-                        </button>
-                        <button 
-                            onClick={()=>{setCurrentAssignment(a); setView('submit')}} 
-                            className="bg-blue-100 text-blue-600 px-4 py-1 rounded text-sm font-bold hover:bg-blue-200"
-                        >
-                            Start
-                        </button>
+                        <button onClick={()=>{setCurrentAssignment(a); setView('history')}} className="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded text-sm font-medium hover:bg-slate-50 flex items-center gap-1"><History size={14}/> History</button>
+                        <button onClick={()=>{setCurrentAssignment(a); setView('submit')}} className="bg-blue-100 text-blue-600 px-4 py-1 rounded text-sm font-bold hover:bg-blue-200">Start</button>
                     </div>
                   )}
-                  {/* ------------------------------------ */}
-
                 </div>
               </div>
             ))}
