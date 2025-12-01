@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/ApiService';
+import { LogOut } from 'lucide-react'; // Import the icon
 
 export const SeminarList = ({ setActiveSeminar, setView, user }) => {
   
@@ -20,7 +21,7 @@ export const SeminarList = ({ setActiveSeminar, setView, user }) => {
         }
     };
     fetchSeminars();
-  }, []); // Empty dependency array ok
+  }, []); 
 
   const join = async () => { 
     if(!joinCode) return; 
@@ -61,6 +62,24 @@ export const SeminarList = ({ setActiveSeminar, setView, user }) => {
     }
   };
 
+  // --- NEW FUNCTION: Handle Leaving a Seminar ---
+  const leave = async (e, seminarId) => {
+    e.stopPropagation(); // Prevent the click from opening the dashboard
+    if (!window.confirm("Are you sure you want to leave this seminar?")) return;
+
+    try {
+        const res = await api.request(`/seminar/${seminarId}/leave`, 'POST');
+        if (res.ok) {
+            // Remove the seminar from the local list
+            setSeminars(seminars.filter(s => s.id !== seminarId));
+        } else {
+            alert(res.data.error || "Failed to leave seminar");
+        }
+    } catch (e) {
+        alert("Network Error during leave");
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 pt-6">
       <div className="flex justify-between items-end border-b pb-4">
@@ -82,8 +101,24 @@ export const SeminarList = ({ setActiveSeminar, setView, user }) => {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {seminars.map(s => (
-          <div key={s.id} onClick={()=>{setActiveSeminar(s); setView('dashboard')}} className="bg-white p-6 rounded shadow cursor-pointer hover:shadow-md transition-shadow border border-slate-100 hover:border-[#40E0D0]">
-            <h3 className="font-bold text-lg text-[#1B3147]">{s.title}</h3>
+          <div key={s.id} onClick={()=>{setActiveSeminar(s); setView('dashboard')}} className="bg-white p-6 rounded shadow cursor-pointer hover:shadow-md transition-shadow border border-slate-100 hover:border-[#40E0D0] group relative">
+            <div className="flex justify-between items-start">
+              <h3 className="font-bold text-lg text-[#1B3147]">{s.title}</h3>
+              
+              {/* --- ADDED: LEAVE BUTTON --- */}
+              {/* Only show for members who are NOT the creator */}
+              {user.id !== s.creator_id && (
+                  <button 
+                    onClick={(e) => leave(e, s.id)}
+                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                    title="Leave Seminar"
+                  >
+                    <LogOut size={18} />
+                  </button>
+              )}
+              {/* --------------------------- */}
+
+            </div>
             <p className="text-gray-500 text-sm">Code: {s.invite_code}</p>
             {s.creator_name && <p className="text-xs text-gray-400 mt-2">By {s.creator_name}</p>}
           </div>
