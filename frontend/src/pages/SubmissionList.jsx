@@ -1,46 +1,94 @@
 import React from 'react';
-import { Eye } from 'lucide-react';
-import { Badge } from '../components/CommonUI';
 
-export const SubmissionList = ({ submissionsList, setView, setGradingResult, currentAssignment }) => {
+export const SubmissionList = ({
+  submissionsList,
+  setView,
+  setGradingResult,
+  currentAssignment,
+}) => {
+  // Guard: avoid crashing if route is opened directly / on refresh
+  if (!currentAssignment) {
+    return (
+      <div className="p-6">
+        <h2 className="text-xl font-semibold text-slate-800 mb-2">
+          No assignment selected
+        </h2>
+        <p className="text-slate-500">
+          Please go back to the dashboard and select an assignment first.
+        </p>
+      </div>
+    );
+  }
+
+  const safeParse = (val) => {
+    if (typeof val !== 'string') return val;
+    try {
+      return JSON.parse(val);
+    } catch (e) {
+      console.error('Failed to parse grading_result', e, val);
+      return null;
+    }
+  };
+
   const handleView = (sub) => {
-    // Parse JSON fields if they are strings
-    const parse = (val) => (typeof val === 'string' ? JSON.parse(val) : val);
+    const parsedGradingResult = safeParse(sub.grading_result);
+
     setGradingResult({
-      grading_result: parse(sub.grading_result),
+      grading_result: parsedGradingResult,
       generated_code: sub.generated_code,
       method_used: sub.submission_mode,
       language: currentAssignment.language,
-      complexity: sub.complexity,
-      plagiarism_score: sub.plagiarism_score,
-      static_analysis: parse(sub.static_analysis_report),
-      test_results: parse(sub.test_results),
-      is_correct: parse(sub.grading_result)?.is_correct,
-      logic_errors: parse(sub.grading_result)?.logic_errors
+      assignment_title: currentAssignment.title,
+      student_name: sub.student_name,
+      submitted_at: sub.submitted_at,
     });
+
     setView('grading');
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pt-6">
-      <div className="flex items-center gap-4"><button onClick={() => setView('dashboard')} className="text-slate-500">&larr; Back</button><h2 className="text-2xl font-bold">Submissions: {currentAssignment?.title}</h2></div>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-slate-50 border-b border-slate-200"><tr><th className="p-4">ID</th><th className="p-4">Mode</th><th className="p-4">Score</th><th className="p-4">Plagiarism</th><th className="p-4">Date</th><th className="p-4">Action</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{submissionsList.map(sub => { 
-              const result = typeof sub.grading_result === 'string' ? JSON.parse(sub.grading_result) : sub.grading_result; 
-              let plagColor = "bg-green-100 text-green-700"; if (sub.plagiarism_score > 50) plagColor = "bg-red-100 text-red-700"; else if (sub.plagiarism_score > 20) plagColor = "bg-yellow-100 text-yellow-700";
-              return (
-                <tr key={sub.id} className="hover:bg-slate-50">
-                  <td className="p-4 text-slate-500">#{sub.id}</td>
-                  <td className="p-4"><span className="px-2 py-1 rounded text-xs font-bold uppercase bg-blue-100 text-blue-700">{sub.submission_mode}</span></td>
-                  <td className="p-4"><Badge score={result?.score || 0} /></td>
-                  <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${plagColor}`}>{sub.plagiarism_score}% Match</span></td>
-                  <td className="p-4 text-slate-500 text-sm">{new Date(sub.created_at).toLocaleDateString()}</td>
-                  <td className="p-4"><button onClick={() => handleView(sub)} className="text-blue-600 hover:underline"><Eye size={18} /></button></td>
-                </tr>
-              ); })}</tbody>
-        </table>
+    <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#1B3147] mb-1">
+          Submissions for: {currentAssignment.title}
+        </h1>
+        <p className="text-slate-500 text-sm">
+          Click on a submission to view the grading details.
+        </p>
+      </div>
+
+      {(!submissionsList || submissionsList.length === 0) && (
+        <div className="p-4 rounded-lg bg-white border border-slate-200 text-slate-500">
+          No submissions yet for this assignment.
+        </div>
+      )}
+
+      <div className="mt-4 space-y-3">
+        {submissionsList &&
+          submissionsList.map((sub) => (
+            <button
+              key={sub.id}
+              onClick={() => handleView(sub)}
+              className="w-full text-left bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md hover:border-[#40E0D0] transition-all"
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="font-semibold text-slate-800">
+                    {sub.student_name || 'Unknown student'}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Submitted at:{' '}
+                    {sub.submitted_at
+                      ? new Date(sub.submitted_at).toLocaleString()
+                      : '—'}
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500">
+                  Mode: {sub.submission_mode || 'N/A'}
+                </div>
+              </div>
+            </button>
+          ))}
       </div>
     </div>
   );
