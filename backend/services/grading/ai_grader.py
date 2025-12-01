@@ -48,14 +48,16 @@ def grade_with_ai(student_code: str, template_code: str, assignment_prompt: str,
     if not API_KEY:
         return {"score": 0, "feedback": "System Error: AI Key Missing", "is_correct": False, "logic_errors": []}
     
+    # --- UPDATED: STRICTER SYSTEM PROMPT ---
     system_prompt = (
-        "You are a strict Computer Science Professor grading a Thesis project. "
-        "You must analyze the algorithm using Chain-of-Thought reasoning. "
-        "1. Trace the execution of the student's code. "
-        "2. Compare it to the reference template for logic divergence. "
-        "3. Estimate Big-O Time and Space complexity. "
-        "4. Provide a corrected version of the code if there are bugs. "
-        "5. Assign a fair score based on the rubric."
+        "You are a strict, deterministic Computer Science Professor grading a Thesis project. "
+        "Your grading must be consistent: identical code must receive identical scores. "
+        "Analyze the algorithm using Chain-of-Thought reasoning: "
+        "1. Trace the execution. If the logic fails to produce the correct output for the problem description, the score for correctness must be below 50. "
+        "2. Compare strictly to the reference solution. Divergence in logic (not just variable names) should result in point deductions. "
+        "3. Estimate Big-O. Inefficient solutions (e.g., O(n^2) when O(n) is possible) lose 10-20 points in efficiency. "
+        "4. Penalize edge cases (empty inputs, negative numbers) if not handled. "
+        "5. Provide a specific, numeric breakdown."
     )
 
     user_prompt = f"""
@@ -80,7 +82,7 @@ def grade_with_ai(student_code: str, template_code: str, assignment_prompt: str,
         "generationConfig": {
             "responseMimeType": "application/json", 
             "responseSchema": GRADING_SCHEMA,
-            "temperature": 0.2 # Low temperature for consistent grading
+            "temperature": 0.0 # --- UPDATED: Zero temperature for maximum determinism ---
         }
     }
 
