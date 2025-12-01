@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/ApiService';
+// UPDATE: Import Play, Terminal, Loader2 icons
+import { Play, Terminal, Loader2 } from 'lucide-react'; 
 
 export const StudentSubmission = ({
   currentAssignment,
@@ -24,10 +26,15 @@ export const StudentSubmission = ({
   // --- STATE MANAGEMENT ---
   const [code, setCode] = useState('');
   const [file, setFile] = useState(null);
-  const [description, setDescription] = useState(''); // New State for Description
-  const [diagramType, setDiagramType] = useState('flowchart'); // New State for Diagram Type
-  const [submissionMode, setSubmissionMode] = useState('xml'); // New State for Mode
+  const [description, setDescription] = useState(''); 
+  const [diagramType, setDiagramType] = useState('flowchart'); 
+  const [submissionMode, setSubmissionMode] = useState('xml'); 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // NEW STATE for Execution
+  const [isRunning, setIsRunning] = useState(false);
+  const [consoleOutput, setConsoleOutput] = useState(null);
+  const [stdInput, setStdInput] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,7 +77,6 @@ export const StudentSubmission = ({
         return;
       }
 
-      // Expect backend to return grading data
       const data = res.data || {};
       
       setGradingResult({
@@ -81,16 +87,44 @@ export const StudentSubmission = ({
         assignment_title: currentAssignment.title,
         student_name: data.student_name ?? '',
         submitted_at: data.submitted_at ?? new Date().toISOString(),
-        complexity: data.complexity ?? 0, // <--- ADDED: Pass complexity to result view
+        complexity: data.complexity ?? 0, 
       });
 
-      // Navigate to grading view
       setView('grading');
     } catch (err) {
       console.error('Submission error', err);
       alert('Unexpected error during submission.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // --- NEW FUNCTION: Handle Code Execution ---
+  const handleRunCode = async () => {
+    if (!code.trim()) {
+        alert("Please enter some code to run.");
+        return;
+    }
+    
+    setIsRunning(true);
+    setConsoleOutput(null); // Clear previous output
+
+    try {
+        const res = await api.request('/execute', 'POST', {
+            code: code,
+            language: currentAssignment.language,
+            input_str: stdInput
+        });
+
+        if (res.ok) {
+            setConsoleOutput(res.data);
+        } else {
+            setConsoleOutput({ success: false, error: res.data.error || "Execution failed" });
+        }
+    } catch (e) {
+        setConsoleOutput({ success: false, error: "Network Error" });
+    } finally {
+        setIsRunning(false);
     }
   };
 
@@ -169,17 +203,51 @@ export const StudentSubmission = ({
           />
         </div>
 
-        {/* --- 4. OPTIONAL CODE PASTE --- */}
+        {/* --- 4. CODE EDITOR & PLAYGROUND (Modified) --- */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Paste generated code (Optional fallback)
+            Code Playground ({currentAssignment.language})
           </label>
-          <textarea
-            className="w-full min-h-[100px] border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#40E0D0]"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="If you have the code already, you can paste it here..."
-          />
+          <p className="text-xs text-slate-400 mb-2">
+            Test your generated code here before submitting.
+          </p>
+          <div className="border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-[#40E0D0]">
+              <textarea
+                className="w-full min-h-[150px] p-3 text-sm font-mono outline-none resize-y bg-slate-50"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder={`Type or paste your ${currentAssignment.language} code here to test it...`}
+              />
+              
+              {/* Playground Toolbar */}
+              <div className="bg-slate-100 p-2 flex gap-2 border-t border-slate-200 items-center">
+                  <input 
+                    placeholder="Stdin Input (Optional)" 
+                    className="flex-1 text-sm p-1.5 rounded border border-slate-300 outline-none focus:border-[#40E0D0]"
+                    value={stdInput}
+                    onChange={(e) => setStdInput(e.target.value)}
+                  />
+                  <button 
+                    type="button" // Important: Prevent form submission
+                    onClick={handleRunCode}
+                    disabled={isRunning || !code.trim()}
+                    className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded text-sm font-bold hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {isRunning ? <Loader2 className="animate-spin" size={16}/> : <Play size={16}/>}
+                    Run Code
+                  </button>
+              </div>
+          </div>
+
+          {/* Console Output Area */}
+          {consoleOutput && (
+              <div className={`mt-2 p-3 rounded-lg text-sm font-mono whitespace-pre-wrap border ${consoleOutput.success ? 'bg-slate-900 text-green-400 border-slate-700' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-1 mb-2 opacity-70">
+                    <Terminal size={14}/> Console Output
+                  </div>
+                  {consoleOutput.output || consoleOutput.error || "No output"}
+              </div>
+          )}
         </div>
 
         {/* --- ACTION BUTTONS --- */}

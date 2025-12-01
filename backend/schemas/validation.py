@@ -74,3 +74,15 @@ class SubmissionCreateSchema(BaseModel):
     def validate_type(cls, v):
         if v.lower() not in ALLOWED_DIAGRAM_TYPES: raise ValueError("Invalid type")
         return v.lower()
+
+# --- EXECUTION --- (New Schema)
+class CodeExecutionSchema(BaseModel):
+    code: str = Field(..., min_length=1, description="Source code to run")
+    language: str = Field(..., description="Target language")
+    input_str: Optional[str] = Field("", description="Stdin input for the program")
+
+    @validator('language')
+    def validate_language(cls, v):
+        if v.lower() not in ALLOWED_LANGUAGES: 
+            raise ValueError(f"Language must be one of {ALLOWED_LANGUAGES}")
+        return v.lower()

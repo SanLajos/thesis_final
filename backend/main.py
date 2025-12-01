@@ -15,9 +15,11 @@ from backend.services.parsers.flowchart import parse_drawio_xml as parse_flowcha
 from backend.services.parsers.nassi import parse_nassi_shneiderman_xml as parse_ns
 from backend.services.parsers.image import parse_image_diagram
 from backend.services.grading.ai_grader import grade_with_ai
+# Updated Import with CodeExecutionSchema
 from backend.schemas.validation import (
     AssignmentCreateSchema, SubmissionCreateSchema, 
-    UserRegisterSchema, UserLoginSchema, SeminarCreateSchema
+    UserRegisterSchema, UserLoginSchema, SeminarCreateSchema,
+    CodeExecutionSchema
 )
 from backend.core.auth import hash_password, verify_password, decode_token, generate_tokens
 from backend.services.analysis.complexity import calculate_cyclomatic_complexity
@@ -26,7 +28,8 @@ from backend.services.analysis.cfg import analyze_flowchart_cfg
 from backend.core.database import get_db_connection, release_db_connection
 from backend.services.grading.static_analysis import analyze_code_style
 from backend.services.grading.keyword import grade_with_keywords
-from backend.services.execution.engine import run_test_cases
+# Updated Import with execution functions
+from backend.services.execution.engine import run_test_cases, execute_python, execute_cpp, execute_java
 from backend.services.chatbot import chat_with_tutor
 
 # --- CONFIGURATION ---
@@ -174,6 +177,43 @@ def get_me():
     u = get_current_user()
     if not u: return jsonify({"error": "Unauthorized"}), 401
     return jsonify({"user": {"id": u['user_id'], "role": u['role'], "username": u['username']}})
+
+# --- NEW ROUTE: Manual Code Execution ---
+@app.route('/execute', methods=['POST'])
+@limiter.limit("10 per minute")
+def execute_code():
+    user = get_current_user()
+    if not user: return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        data = CodeExecutionSchema(**request.json)
+    except ValidationError as e: return jsonify({"error": str(e)}), 400
+
+    # 1. Security Check
+    is_safe, unsafe_keyword = validate_code_safety(data.code, data.language)
+    if not is_safe:
+        return jsonify({
+            "success": False, 
+            "output": "", 
+            "error": f"Security Violation: usage of forbidden keyword '{unsafe_keyword}'."
+        }), 200 # Return 200 to display nicely in frontend
+
+    # 2. Select Executor
+    executor = {
+        'python': execute_python,
+        'cpp': execute_cpp,
+        'java': execute_java
+    }.get(data.language)
+
+    if not executor:
+        return jsonify({"error": "Language not supported"}), 400
+
+    # 3. Run Code
+    try:
+        result = executor(data.code, data.input_str)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Server Error: {str(e)}"}), 500
 
 @app.route('/chat', methods=['POST'])
 @limiter.limit("10 per minute")
