@@ -1,4 +1,7 @@
 import React from 'react';
+// 1. Import Badge and Icons
+import { Badge } from '../components/CommonUI';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 
 export const SubmissionList = ({
   submissionsList,
@@ -6,7 +9,6 @@ export const SubmissionList = ({
   setGradingResult,
   currentAssignment,
 }) => {
-  // Guard: avoid crashing if route is opened directly / on refresh
   if (!currentAssignment) {
     return (
       <div className="p-6">
@@ -32,6 +34,8 @@ export const SubmissionList = ({
 
   const handleView = (sub) => {
     const parsedGradingResult = safeParse(sub.grading_result);
+    // ... (Keep existing safeParse logic for other fields if needed, 
+    // e.g. static_analysis, though mostly grading_result is critical here)
 
     setGradingResult({
       grading_result: parsedGradingResult,
@@ -39,8 +43,10 @@ export const SubmissionList = ({
       method_used: sub.submission_mode,
       language: currentAssignment.language,
       assignment_title: currentAssignment.title,
-      student_name: sub.student_name,
+      student_name: sub.student_name, // Now available from Backend
       submitted_at: sub.submitted_at,
+      complexity: sub.complexity,
+      plagiarism_score: sub.plagiarism_score
     });
 
     setView('grading');
@@ -65,7 +71,13 @@ export const SubmissionList = ({
 
       <div className="mt-4 space-y-3">
         {submissionsList &&
-          submissionsList.map((sub) => (
+          submissionsList.map((sub) => {
+            // 2. Extract Data for Display
+            const result = safeParse(sub.grading_result);
+            const score = result ? result.score : null;
+            const plag = sub.plagiarism_score || 0;
+
+            return (
             <button
               key={sub.id}
               onClick={() => handleView(sub)}
@@ -73,22 +85,38 @@ export const SubmissionList = ({
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="font-semibold text-slate-800">
-                    {sub.student_name || 'Unknown student'}
+                  {/* 3. Display Student Name */}
+                  <div className="font-semibold text-slate-800 text-lg">
+                    {sub.student_name || 'Unknown Student'}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
-                    Submitted at:{' '}
-                    {sub.submitted_at
-                      ? new Date(sub.submitted_at).toLocaleString()
-                      : '—'}
+                    Submitted: {sub.created_at ? new Date(sub.created_at).toLocaleString() : '—'}
                   </div>
                 </div>
-                <div className="text-xs text-slate-500">
-                  Mode: {sub.submission_mode || 'N/A'}
+
+                <div className="flex items-center gap-4">
+                  {/* 4. Display Plagiarism Score */}
+                  {plag > 0 && (
+                    <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded ${plag > 20 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                        <AlertTriangle size={12}/> Plagiarism: {plag}%
+                    </div>
+                  )}
+
+                  {/* 5. Display Grade Badge */}
+                  {score !== null ? (
+                    <Badge score={score} />
+                  ) : (
+                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Not Graded</span>
+                  )}
+
+                  {/* 6. Display Mode */}
+                  <div className="text-xs text-slate-500 border-l pl-4 border-slate-200 uppercase font-mono">
+                    {sub.submission_mode || 'N/A'}
+                  </div>
                 </div>
               </div>
             </button>
-          ))}
+          )})}
       </div>
     </div>
   );

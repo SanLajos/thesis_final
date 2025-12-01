@@ -357,7 +357,18 @@ def list_assignment_submissions(aid):
         cur.execute("SELECT creator_id FROM assignments WHERE id=%s", (aid,))
         a = cur.fetchone()
         if u['role']!='admin' and a['creator_id']!=u['user_id']: return jsonify({"error": "Denied"}), 403
-        cur.execute("SELECT * FROM submissions WHERE assignment_id=%s ORDER BY created_at DESC", (aid,))
+        
+        # --- MODIFIED QUERY: JOIN with users table to get username ---
+        query = """
+            SELECT s.*, u.username as student_name 
+            FROM submissions s
+            JOIN users u ON s.student_id = u.id
+            WHERE s.assignment_id = %s 
+            ORDER BY s.created_at DESC
+        """
+        cur.execute(query, (aid,))
+        # -------------------------------------------------------------
+        
         return jsonify(cur.fetchall())
     finally: cur.close(); release_db_connection(conn)
 
