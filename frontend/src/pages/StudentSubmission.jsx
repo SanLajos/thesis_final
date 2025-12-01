@@ -38,7 +38,7 @@ export const StudentSubmission = ({
       }
 
       if (file) {
-        formData.append('file', file);
+        formData.append('diagram_file', file);
       }
 
       const res = await api.request(
