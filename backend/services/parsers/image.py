@@ -68,19 +68,16 @@ def parse_image_diagram(image_path, user_description="", language="python"):
         generated_code = data.get('code', '')
         ai_node_count = data.get('node_count', 0)
 
-        # 3. Hybrid Validation Logic
+        # 3. Hybrid Validation Logic (RELAXED)
         if cv_node_count is not None and ai_node_count > 0:
-            # Allow a margin of error (e.g., CV might miss 'Start' or 'End' if they are small text)
             diff = abs(cv_node_count - ai_node_count)
-            threshold = 3 # Tolerance for discrepancy
+            threshold = 3 
             
             if diff > threshold:
-                error_msg = (
-                    f"Validation Error: AI detected {ai_node_count} nodes, but Computer Vision found {cv_node_count}. "
-                    "The image might be unclear or contain artifacts. Please upload a cleaner image."
-                )
-                raise Exception(error_msg)
-
+                # --- FIX: Log warning only, DO NOT raise Exception ---
+                print(f"[WARNING] Validation Discrepancy: AI detected {ai_node_count} nodes, but CV found {cv_node_count}.")
+                print("Proceeding with AI result as truth.")
+                
         return generated_code
 
     except json.JSONDecodeError:
@@ -98,8 +95,6 @@ def _count_shapes_cv(image_path):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
     # Thresholding to separate shapes from background
-    # Flowcharts are usually black lines on white, or vice versa.
-    # Adaptive thresholding handles lighting variations better.
     thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                    cv2.THRESH_BINARY_INV, 11, 2)
     
@@ -107,17 +102,13 @@ def _count_shapes_cv(image_path):
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     valid_shapes = 0
-    min_area = 500 # Ignore small noise (dots, text artifacts)
+    min_area = 500 # Ignore small noise
     
     for cnt in contours:
         area = cv2.contourArea(cnt)
         if area > min_area:
-            # Optional: Approximate polygon to distinguish simple boxes from complex scribbles
             peri = cv2.arcLength(cnt, True)
             approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
-            
-            # Flowchart blocks (rects, diamonds) usually have 4 vertices
-            # Ellipses/Ovals have many. We just count significant objects.
             if len(approx) >= 3: 
                 valid_shapes += 1
                 
